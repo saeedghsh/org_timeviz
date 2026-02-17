@@ -1,0 +1,14 @@
+name: org_timeviz
+
+channels:
+  - conda-forge
+  - nodefaults
+
+dependencies:
+  - python=3.12
+  - pydantic>=2.11
+  - pyyaml>=6.0
+  - matplotlib>=3.8
+  - pip
+  - pip:
+      - types-PyYAML

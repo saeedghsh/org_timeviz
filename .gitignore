@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+.conda/
+.mypy_cache/
+.pytest_cache/
+.pylint.d/
+.vscode/
+
+*~
+
+outputs/

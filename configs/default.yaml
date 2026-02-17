@@ -1,0 +1,59 @@
+app:
+  output_dir: outputs
+  log_level: INFO
+
+org_sources:
+  mode: emacs
+  emacs_init_paths:
+    - "~/.emacs"
+    - "~/.emacs.d/init.el"
+  emacs_agenda_var: org-agenda-files
+  explicit_files: []
+
+periods:
+  - name: last_7_days
+    kind: last_n_days
+    n: 7
+    align_to_day_boundary: true
+
+  - name: last_30_days
+    kind: last_n_days
+    n: 30
+    align_to_day_boundary: true
+
+  - name: this_week
+    kind: this_week
+
+  - name: this_month
+    kind: this_month
+
+reports:
+  - name: weekly_overview
+    period: last_7_days
+    filters:
+      include_tags: []
+      exclude_tags: []
+      tag_match_mode: any
+      include_task_regex: []
+      exclude_task_regex: []
+    plots:
+      - kind: bar_by_tag
+        top_k: 20
+      - kind: bar_by_task
+        top_k: 25
+      - kind: timeseries_daily_total
+        rolling_days: 1
+
+  - name: monthly_trend
+    period: last_30_days
+    filters:
+      include_tags: []
+      exclude_tags: []
+      tag_match_mode: any
+      include_task_regex: []
+      exclude_task_regex: []
+    plots:
+      - kind: bar_by_tag
+        top_k: 30
+      - kind: timeseries_daily_total
+        rolling_days: 7

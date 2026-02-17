@@ -1,0 +1,41 @@
+[project]
+name = "org-timeviz"
+version = "0.1.0"
+description = "Generate time-tracking plots from Org-mode CLOCK entries (Org files are the source of truth)."
+requires-python = ">=3.12"
+dependencies = [
+  "pydantic>=2.11",
+  "PyYAML>=6.0",
+  "matplotlib>=3.8",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+disallow_any_generics = true
+no_implicit_optional = true
+
+[tool.pylint.MASTER]
+py-version = "3.12"
+jobs = 0
+
+[tool.pylint.FORMAT]
+max-line-length = 100
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = [
+  "too-few-public-methods",
+  "duplicate-code",
+  "fixme",
+]
