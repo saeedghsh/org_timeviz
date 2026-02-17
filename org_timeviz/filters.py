@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Iterable
 
 from org_timeviz.config import FiltersConfig
-from org_timeviz.org_parser import ClockRecord
+from org_timeviz.models import ClockRecord
 from org_timeviz.time_windows import TimeWindow
 
 
@@ -18,7 +18,9 @@ class ClippedRecord:
     minutes: int
 
 
-def _overlap(a0: datetime, a1: datetime, b0: datetime, b1: datetime) -> tuple[datetime, datetime] | None:
+def _overlap(
+    a0: datetime, a1: datetime, b0: datetime, b1: datetime
+) -> tuple[datetime, datetime] | None:
     start = max(a0, b0)
     end = min(a1, b1)
     if end <= start:

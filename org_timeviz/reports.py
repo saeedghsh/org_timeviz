@@ -7,8 +7,8 @@ from pathlib import Path
 from org_timeviz.aggregate import compute_aggregates
 from org_timeviz.config import AppConfig, PlotConfig
 from org_timeviz.emacs_agenda import read_agenda_files_from_emacs_init
+from org_timeviz.emacs_batch import parse_org_clock_records_emacs
 from org_timeviz.filters import apply_filters, clip_to_window
-from org_timeviz.org_parser import parse_org_clock_records
 from org_timeviz.plots import (
     plot_bar_by_tag,
     plot_bar_by_task,
@@ -16,7 +16,6 @@ from org_timeviz.plots import (
     write_summary_json,
 )
 from org_timeviz.time_windows import resolve_time_windows
-
 
 _LOG = logging.getLogger(__name__)
 
@@ -27,7 +26,9 @@ def _resolve_org_files(cfg: AppConfig) -> list[Path]:
 
     for p in cfg.org_sources.emacs_init_paths:
         init_path = Path(p).expanduser()
-        res = read_agenda_files_from_emacs_init(init_path, var_name=cfg.org_sources.emacs_agenda_var)
+        res = read_agenda_files_from_emacs_init(
+            init_path, var_name=cfg.org_sources.emacs_agenda_var
+        )
         if res is not None and res.files:
             return res.files
 
@@ -52,6 +53,13 @@ def _plot_one(aggs, plot_cfg: PlotConfig, out_dir: Path) -> None:
     raise ValueError(f"Unknown plot kind: {plot_cfg.kind}")
 
 
+def _parse_records(cfg: AppConfig, org_files: list[Path]):
+    return parse_org_clock_records_emacs(
+        org_files=org_files,
+        emacs_executable=cfg.parser.emacs_executable,
+    )
+
+
 def generate_all_reports(cfg: AppConfig) -> None:
     now = datetime.now()
     windows = resolve_time_windows(cfg.periods, now=now)
@@ -59,12 +67,7 @@ def generate_all_reports(cfg: AppConfig) -> None:
     org_files = _resolve_org_files(cfg)
     _LOG.info("Using %s org file(s)", len(org_files))
 
-    all_records = []
-    for f in org_files:
-        if not f.exists():
-            _LOG.warning("Org file not found: %s", f)
-            continue
-        all_records.extend(parse_org_clock_records(f))
+    all_records = _parse_records(cfg, org_files=org_files)
 
     out_root = Path(cfg.app.output_dir).expanduser().resolve()
     out_root.mkdir(parents=True, exist_ok=True)
@@ -74,7 +77,9 @@ def generate_all_reports(cfg: AppConfig) -> None:
             raise KeyError(f"Report {rep.name!r} refers to unknown period {rep.period!r}")
 
         window = windows[rep.period]
-        _LOG.info("Report %s: window %s (%s .. %s)", rep.name, window.name, window.start, window.end)
+        _LOG.info(
+            "Report %s: window %s (%s .. %s)", rep.name, window.name, window.start, window.end
+        )
 
         clipped = clip_to_window(all_records, window=window)
         filtered = apply_filters(clipped, cfg=rep.filters)

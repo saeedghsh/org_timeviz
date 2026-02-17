@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Any, ClassVar, Literal
 
@@ -30,6 +28,13 @@ class AppSettings(_BaseConfig):
 
     output_dir: str = Field(default="outputs")
     log_level: str = Field(default="INFO")
+
+
+class ParserConfig(_BaseConfig):
+    """Select parsing backend."""
+
+    mode: Literal["emacs"] = Field(default="emacs")
+    emacs_executable: str = Field(default="emacs")
 
 
 class OrgSourcesConfig(_BaseConfig):
@@ -108,6 +113,7 @@ class AppConfig(_BaseConfig):
     """Describe full app configuration."""
 
     app: AppSettings = Field(default_factory=AppSettings)
+    parser: ParserConfig = Field(default_factory=ParserConfig)
     org_sources: OrgSourcesConfig = Field(default_factory=OrgSourcesConfig)
     periods: list[PeriodConfig] = Field(default_factory=list)
     reports: list[ReportConfig] = Field(default_factory=list)
