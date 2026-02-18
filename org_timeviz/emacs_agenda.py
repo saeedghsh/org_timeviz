@@ -1,9 +1,6 @@
-from __future__ import annotations
-
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-
 
 _LOG = logging.getLogger(__name__)
 
@@ -85,7 +82,9 @@ def _extract_double_quoted_strings(block: str) -> list[str]:
     return strings
 
 
-def read_agenda_files_from_emacs_init(init_path: Path, var_name: str) -> EmacsAgendaFilesResult | None:
+def read_agenda_files_from_emacs_init(
+    init_path: Path, var_name: str
+) -> EmacsAgendaFilesResult | None:
     """Read org-agenda-files from an Emacs init file."""
     if not init_path.exists():
         return None
