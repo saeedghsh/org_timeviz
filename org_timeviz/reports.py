@@ -53,13 +53,6 @@ def _plot_one(aggs, plot_cfg: PlotConfig, out_dir: Path) -> None:
     raise ValueError(f"Unknown plot kind: {plot_cfg.kind}")
 
 
-def _parse_records(cfg: AppConfig, org_files: list[Path]):
-    return parse_org_clock_records_emacs(
-        org_files=org_files,
-        emacs_executable=cfg.parser.emacs_executable,
-    )
-
-
 def generate_all_reports(cfg: AppConfig) -> None:
     """Generate all configured reports and write artifacts under the output root."""
     now = datetime.now()
@@ -68,7 +61,7 @@ def generate_all_reports(cfg: AppConfig) -> None:
     org_files = _resolve_org_files(cfg)
     _LOG.info("Using %s org file(s)", len(org_files))
 
-    all_records = _parse_records(cfg, org_files=org_files)
+    all_records = parse_org_clock_records_emacs(org_files=org_files)
 
     out_root = Path(cfg.app.output_dir).expanduser().resolve()
     out_root.mkdir(parents=True, exist_ok=True)

@@ -9,10 +9,7 @@ from org_timeviz.models import ClockRecord
 _LOG = logging.getLogger(__name__)
 
 
-def parse_org_clock_records_emacs(
-    org_files: list[Path],
-    emacs_executable: str,
-) -> list[ClockRecord]:
+def parse_org_clock_records_emacs(org_files: list[Path]) -> list[ClockRecord]:
     """Parse CLOCK records by calling Emacs in batch mode."""
     script_path = Path(__file__).resolve().parent / "elisp" / "org_timeviz_export.el"
     if not script_path.exists():
@@ -23,7 +20,7 @@ def parse_org_clock_records_emacs(
         return []
 
     cmd = [
-        emacs_executable,
+        "emacs",
         "--batch",
         "-Q",
         "--load",

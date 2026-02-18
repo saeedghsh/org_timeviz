@@ -1,7 +1,3 @@
-parser:
-  mode: emacs
-  emacs_executable: emacs
-
 app:
   output_dir: outputs
   log_level: INFO
