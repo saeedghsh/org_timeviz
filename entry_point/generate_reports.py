@@ -1,3 +1,5 @@
+"""Generate time tracking report artifacts from Org CLOCK entries."""
+
 import argparse
 import logging
 import os

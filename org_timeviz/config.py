@@ -1,3 +1,5 @@
+"""Define and validate YAML configuration for report generation."""
+
 from pathlib import Path
 from typing import Any, ClassVar, Literal
 

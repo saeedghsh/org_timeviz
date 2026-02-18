@@ -1,3 +1,5 @@
+"""Resolve named time windows used to clip clock intervals."""
+
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Iterable
@@ -13,6 +15,8 @@ from org_timeviz.config import (
 
 @dataclass(frozen=True)
 class TimeWindow:
+    """Represent a half-open time window [start, end) in local time."""
+
     name: str
     start: datetime
     end: datetime  # exclusive
@@ -29,6 +33,7 @@ def _next_month_start(dt: datetime) -> datetime:
 
 
 def resolve_time_windows(periods: Iterable[PeriodConfig], now: datetime) -> dict[str, TimeWindow]:
+    """Resolve configured period specs into concrete time windows."""
     windows: dict[str, TimeWindow] = {}
 
     for p in periods:

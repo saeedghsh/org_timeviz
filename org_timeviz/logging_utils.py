@@ -1,8 +1,10 @@
+"""Configure consistent logging for the application."""
+
 import logging
 
 
 def setup_logger(level: str) -> None:
-    """Configure root logging."""
+    """Configure root logging with a simple, stable format."""
     numeric_level = getattr(logging, level.upper(), logging.INFO)
     logging.basicConfig(
         level=numeric_level,

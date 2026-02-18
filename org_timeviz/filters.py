@@ -1,3 +1,5 @@
+"""Clip clock intervals to time windows and apply tag/task filters."""
+
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -10,6 +12,8 @@ from org_timeviz.time_windows import TimeWindow
 
 @dataclass(frozen=True)
 class ClippedRecord:
+    """Represent a clock record clipped to a window with computed minutes."""
+
     record: ClockRecord
     start: datetime
     end: datetime
@@ -31,6 +35,7 @@ def _minutes_between(start: datetime, end: datetime) -> int:
 
 
 def clip_to_window(records: Iterable[ClockRecord], window: TimeWindow) -> list[ClippedRecord]:
+    """Clip raw records to a half-open window and drop non-overlapping parts."""
     clipped: list[ClippedRecord] = []
     for r in records:
         ov = _overlap(r.start, r.end, window.start, window.end)
@@ -45,6 +50,7 @@ def clip_to_window(records: Iterable[ClockRecord], window: TimeWindow) -> list[C
 
 
 def apply_filters(records: Iterable[ClippedRecord], cfg: FiltersConfig) -> list[ClippedRecord]:
+    """Filter clipped records by tags and outline-path regex rules."""
     include_tags = set(cfg.include_tags)
     exclude_tags = set(cfg.exclude_tags)
 

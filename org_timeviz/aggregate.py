@@ -1,3 +1,5 @@
+"""Aggregate filtered clock records into tag/task/day totals."""
+
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
@@ -8,6 +10,8 @@ from org_timeviz.filters import ClippedRecord
 
 @dataclass(frozen=True)
 class Aggregates:
+    """Hold computed time totals across several common groupings."""
+
     minutes_total: int
     minutes_by_tag: dict[str, int]
     minutes_by_task: dict[str, int]
@@ -15,6 +19,7 @@ class Aggregates:
 
 
 def compute_aggregates(records: Iterable[ClippedRecord]) -> Aggregates:
+    """Compute total minutes and breakdowns by tag, task, and day."""
     minutes_by_tag: dict[str, int] = defaultdict(int)
     minutes_by_task: dict[str, int] = defaultdict(int)
     minutes_by_day: dict[date, int] = defaultdict(int)

@@ -1,3 +1,5 @@
+"""Read org-agenda-files from an Emacs init file using minimal parsing."""
+
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,6 +9,8 @@ _LOG = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class EmacsAgendaFilesResult:
+    """Hold agenda file paths discovered from an Emacs init file."""
+
     files: list[Path]
     source_path: Path
 
@@ -85,7 +89,7 @@ def _extract_double_quoted_strings(block: str) -> list[str]:
 def read_agenda_files_from_emacs_init(
     init_path: Path, var_name: str
 ) -> EmacsAgendaFilesResult | None:
-    """Read org-agenda-files from an Emacs init file."""
+    """Extract org-agenda-files from an Emacs init file, if present."""
     if not init_path.exists():
         return None
 

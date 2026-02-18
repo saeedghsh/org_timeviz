@@ -1,3 +1,5 @@
+"""Orchestrate parsing, filtering, aggregation, and artifact generation."""
+
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -59,6 +61,7 @@ def _parse_records(cfg: AppConfig, org_files: list[Path]):
 
 
 def generate_all_reports(cfg: AppConfig) -> None:
+    """Generate all configured reports and write artifacts under the output root."""
     now = datetime.now()
     windows = resolve_time_windows(cfg.periods, now=now)
 

@@ -1,3 +1,5 @@
+"""Generate plot and summary artifacts from aggregated time totals."""
+
 import json
 from pathlib import Path
 
@@ -15,6 +17,7 @@ def _top_k(items: dict[str, int], k: int) -> list[tuple[str, int]]:
 
 
 def plot_bar_by_tag(aggs: Aggregates, out_path: Path, top_k: int) -> None:
+    """Plot a bar chart of total hours per tag."""
     pairs = _top_k(aggs.minutes_by_tag, top_k)
     labels = [p[0] for p in pairs]
     values = [_minutes_to_hours(p[1]) for p in pairs]
@@ -30,6 +33,7 @@ def plot_bar_by_tag(aggs: Aggregates, out_path: Path, top_k: int) -> None:
 
 
 def plot_bar_by_task(aggs: Aggregates, out_path: Path, top_k: int) -> None:
+    """Plot a bar chart of total hours per task (outline path)."""
     pairs = _top_k(aggs.minutes_by_task, top_k)
     labels = [p[0] for p in pairs]
     values = [_minutes_to_hours(p[1]) for p in pairs]
@@ -45,6 +49,7 @@ def plot_bar_by_task(aggs: Aggregates, out_path: Path, top_k: int) -> None:
 
 
 def plot_timeseries_daily_total(aggs: Aggregates, out_path: Path, rolling_days: int) -> None:
+    """Plot daily total hours, optionally smoothed by a rolling mean."""
     days = sorted(aggs.minutes_by_day.keys())
     if not days:
         plt.figure()
@@ -81,6 +86,7 @@ def _rolling_mean(values: list[float], window: int) -> list[float]:
 
 
 def write_summary_json(aggs: Aggregates, out_path: Path) -> None:
+    """Write a compact JSON summary of the report totals."""
     payload = {
         "minutes_total": aggs.minutes_total,
         "hours_total": _minutes_to_hours(aggs.minutes_total),
