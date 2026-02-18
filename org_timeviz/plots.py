@@ -2,10 +2,14 @@
 
 import json
 from pathlib import Path
+from typing import Final
 
 import matplotlib.pyplot as plt
 
 from org_timeviz.aggregate import Aggregates
+
+FIGSIZE: Final[tuple[float, float]] = (20.0, 12)
+FIGSIZE_TASK: Final[tuple[float, float]] = (20.0, 12)
 
 
 def _minutes_to_hours(minutes: int) -> float:
@@ -16,20 +20,33 @@ def _top_k(items: dict[str, int], k: int) -> list[tuple[str, int]]:
     return sorted(items.items(), key=lambda kv: kv[1], reverse=True)[:k]
 
 
+def _finalize_figure(fig: plt.Figure, out_path: Path) -> None:
+    # bbox_inches="tight" prevents rotated tick labels from being cropped.
+    fig.tight_layout()
+    fig.savefig(out_path, bbox_inches="tight")
+    plt.close(fig)
+
+
+def _set_xtick_style(ax: plt.Axes, rotation: float) -> None:
+    ax.tick_params(axis="x", labelrotation=rotation)
+    for lbl in ax.get_xticklabels():
+        lbl.set_horizontalalignment("right")
+
+
 def plot_bar_by_tag(aggs: Aggregates, out_path: Path, top_k: int) -> None:
     """Plot a bar chart of total hours per tag."""
     pairs = _top_k(aggs.minutes_by_tag, top_k)
     labels = [p[0] for p in pairs]
     values = [_minutes_to_hours(p[1]) for p in pairs]
 
-    plt.figure()
-    plt.bar(labels, values)
-    plt.xticks(rotation=45, ha="right")
-    plt.ylabel("Hours")
-    plt.title("Total hours by tag")
-    plt.tight_layout()
-    plt.savefig(out_path)
-    plt.close()
+    fig, ax = plt.subplots(figsize=FIGSIZE)
+    ax.bar(labels, values)
+    _set_xtick_style(ax, rotation=45)
+
+    ax.set_ylabel("Hours")
+    ax.set_title("Total hours by tag")
+
+    _finalize_figure(fig, out_path)
 
 
 def plot_bar_by_task(aggs: Aggregates, out_path: Path, top_k: int) -> None:
@@ -38,40 +55,38 @@ def plot_bar_by_task(aggs: Aggregates, out_path: Path, top_k: int) -> None:
     labels = [p[0] for p in pairs]
     values = [_minutes_to_hours(p[1]) for p in pairs]
 
-    plt.figure()
-    plt.bar(labels, values)
-    plt.xticks(rotation=60, ha="right")
-    plt.ylabel("Hours")
-    plt.title("Total hours by task (outline path)")
-    plt.tight_layout()
-    plt.savefig(out_path)
-    plt.close()
+    # Taller figure to accommodate long, rotated labels.
+    fig, ax = plt.subplots(figsize=FIGSIZE_TASK)
+    ax.bar(labels, values)
+    _set_xtick_style(ax, rotation=90)
+
+    ax.set_ylabel("Hours")
+    ax.set_title("Total hours by task (outline path)")
+
+    _finalize_figure(fig, out_path)
 
 
 def plot_timeseries_daily_total(aggs: Aggregates, out_path: Path, rolling_days: int) -> None:
     """Plot daily total hours, optionally smoothed by a rolling mean."""
     days = sorted(aggs.minutes_by_day.keys())
+    fig, ax = plt.subplots(figsize=FIGSIZE)
+
     if not days:
-        plt.figure()
-        plt.title("Daily total hours")
-        plt.tight_layout()
-        plt.savefig(out_path)
-        plt.close()
+        ax.set_title("Daily total hours")
+        _finalize_figure(fig, out_path)
         return
 
     values = [_minutes_to_hours(aggs.minutes_by_day[d]) for d in days]
-
     if rolling_days > 1:
         values = _rolling_mean(values, window=rolling_days)
 
-    plt.figure()
-    plt.plot(days, values)
-    plt.xticks(rotation=45, ha="right")
-    plt.ylabel("Hours")
-    plt.title("Daily total hours")
-    plt.tight_layout()
-    plt.savefig(out_path)
-    plt.close()
+    ax.plot(days, values)
+    _set_xtick_style(ax, rotation=45)
+
+    ax.set_ylabel("Hours")
+    ax.set_title("Daily total hours")
+
+    _finalize_figure(fig, out_path)
 
 
 def _rolling_mean(values: list[float], window: int) -> list[float]:
