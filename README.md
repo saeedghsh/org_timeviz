@@ -58,6 +58,12 @@ If you want a new plot type:
 
 No intermediate data is stored on disk (only final report artifacts).
 
+## Laundry List
+
+- [ ] filter "by task" by hierarchy level.
+- [ ] the timeseries is nice, but maybe a representation that also
+      show tasks/tags which have been the focus in each period.
+
 ## License
 
 Distributed with a GNU GENERAL PUBLIC LICENSE; see LICENSE.
