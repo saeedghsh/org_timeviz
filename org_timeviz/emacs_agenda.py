@@ -1,6 +1,7 @@
-"""Read org-agenda-files from an Emacs init file using minimal parsing."""
+"""Read org-agenda-files and Org TODO keywords from an Emacs init file."""
 
 import logging
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,77 +14,6 @@ class EmacsAgendaFilesResult:
 
     files: list[Path]
     source_path: Path
-
-
-def _find_setq_block(text: str, var_name: str) -> str | None:
-    needle = var_name
-    idx = text.find(needle)
-    if idx < 0:
-        return None
-
-    setq_idx = text.rfind("(setq", 0, idx)
-    if setq_idx < 0:
-        return None
-
-    depth = 0
-    in_str = False
-    esc = False
-    end_idx = None
-
-    for i in range(setq_idx, len(text)):
-        ch = text[i]
-        if in_str:
-            if esc:
-                esc = False
-            elif ch == "\\":  # escape char in elisp strings
-                esc = True
-            elif ch == '"':
-                in_str = False
-            continue
-
-        if ch == '"':
-            in_str = True
-            continue
-
-        if ch == "(":
-            depth += 1
-        elif ch == ")":
-            depth -= 1
-            if depth == 0:
-                end_idx = i + 1
-                break
-
-    if end_idx is None:
-        return None
-
-    return text[setq_idx:end_idx]
-
-
-def _extract_double_quoted_strings(block: str) -> list[str]:
-    strings: list[str] = []
-    i = 0
-    while i < len(block):
-        if block[i] != '"':
-            i += 1
-            continue
-        i += 1
-        buf: list[str] = []
-        esc = False
-        while i < len(block):
-            ch = block[i]
-            if esc:
-                buf.append(ch)
-                esc = False
-            elif ch == "\\":  # escape char in elisp strings
-                esc = True
-            elif ch == '"':
-                break
-            else:
-                buf.append(ch)
-            i += 1
-        strings.append("".join(buf))
-        i += 1
-    return strings
 
 
 def read_agenda_files_from_emacs_init(
@@ -104,3 +34,130 @@ def read_agenda_files_from_emacs_init(
 
     _LOG.info("Read %s agenda file(s) from %s", len(files), init_path)
     return EmacsAgendaFilesResult(files=files, source_path=init_path)
+
+
+def _find_setq_block(text: str, var_name: str) -> str | None:
+    # Find the actual (setq <var_name> ...) form, not just any mention of var_name.
+    pattern = re.compile(r"\(\s*setq\s+" + re.escape(var_name) + r"\b", flags=re.MULTILINE)
+
+    m = pattern.search(text)
+    if m is None:
+        return None
+
+    start_idx = m.start()
+
+    depth = 0
+    in_str = False
+    esc = False
+
+    i = start_idx
+    end_idx: int | None = None
+
+    while i < len(text):
+        ch = text[i]
+
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            i += 1
+            continue
+
+        # Elisp line comment outside strings: from ';' to end-of-line
+        if ch == ";":
+            while i < len(text) and text[i] != "\n":
+                i += 1
+            continue
+
+        if ch == '"':
+            in_str = True
+            i += 1
+            continue
+
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                end_idx = i + 1
+                break
+
+        i += 1
+
+    if end_idx is None:
+        return None
+
+    return text[start_idx:end_idx]
+
+
+def _extract_double_quoted_strings(block: str) -> list[str]:
+    strings: list[str] = []
+    i = 0
+    in_str = False
+    esc = False
+    buf: list[str] = []
+
+    while i < len(block):
+        ch = block[i]
+
+        if not in_str and ch == ";":
+            # Skip line comments outside strings
+            while i < len(block) and block[i] != "\n":
+                i += 1
+            continue
+
+        if in_str:
+            if esc:
+                buf.append(ch)
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                strings.append("".join(buf))
+                buf = []
+                in_str = False
+            else:
+                buf.append(ch)
+            i += 1
+            continue
+
+        if ch == '"':
+            in_str = True
+            i += 1
+            continue
+
+        i += 1
+
+    return strings
+
+
+def read_todo_keywords_from_emacs_init(init_path: Path) -> list[str] | None:
+    """Extract Org TODO keywords from an Emacs init file, if present."""
+    if not init_path.exists():
+        return None
+
+    text = init_path.read_text(encoding="utf-8")
+
+    block = _find_setq_block(text, var_name="org-todo-keywords")
+    if block is None:
+        return None
+
+    kws = _extract_double_quoted_strings(block)
+    if not kws:
+        return None
+
+    # Remove separators and de-duplicate while preserving order.
+    seen: set[str] = set()
+    out: list[str] = []
+    for k in kws:
+        k = k.strip()
+        if not k or k == "|":
+            continue
+        if k not in seen:
+            out.append(k)
+            seen.add(k)
+
+    return out or None
