@@ -14,7 +14,7 @@ Generate plots from Org-mode CLOCK entries while keeping Org files as the single
 ```bash
 conda env create -f environment.yml
 conda activate org_timeviz
-python -m entry_point.generate_reports
+python -m main
 ```
 
 By default it uses:
