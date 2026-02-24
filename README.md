@@ -72,6 +72,7 @@ The code is structured so you can add features without changing the CLI or intro
 - [ ] filter "by task" by hierarchy level.
 - [ ] the timeseries is nice, but maybe a representation that also
       show tasks/tags which have been the focus in each period.
+- [ ] get reports tailored to one tag or one specific task
 
 ## License
 
