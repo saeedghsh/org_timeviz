@@ -13,9 +13,15 @@ ENV_NAME ?= $(shell awk -F: '/^name:/{gsub(/^[ \t]+/, "", $$2); print $$2; exit}
 
 CONDA ?= conda
 
+.PHONY: ensure-env
+ensure-env: ## Ensure the conda env exists (create it if missing).
+	@$(CONDA) env list | awk '{print $$1}' | grep -Fxq "$(ENV_NAME)" \
+		&& echo "conda env '$(ENV_NAME)' already exists." \
+		|| (echo "conda env '$(ENV_NAME)' not found; creating..." && $(MAKE) create-env)
+
 .PHONY: run
-run: ## execute the main script and generate reports
-	$(CONDA) run -n $(ENV_NAME) --no-capture-output python -m main
+run: ensure-env ## Run `python -m main` inside the repo conda env.
+	@$(CONDA) run -n $(ENV_NAME) --no-capture-output python -m main
 
 ########################################
 ###################### CONDA ENVIRONMENT
