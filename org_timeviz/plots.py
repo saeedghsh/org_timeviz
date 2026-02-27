@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Final
 
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
 from .aggregate import Aggregates
 
@@ -33,14 +35,14 @@ def _top_k(items: dict[str, int], k: int) -> list[tuple[str, int]]:
     return sorted(items.items(), key=lambda kv: kv[1], reverse=True)[:k]
 
 
-def _finalize_figure(fig: plt.Figure, out_path: Path) -> None:
+def _finalize_figure(fig: Figure, out_path: Path) -> None:
     # bbox_inches="tight" prevents rotated tick labels from being cropped.
     fig.tight_layout()
     fig.savefig(out_path, bbox_inches="tight")
     plt.close(fig)
 
 
-def _set_xtick_style(ax: plt.Axes, rotation: float) -> None:
+def _set_xtick_style(ax: Axes, rotation: float) -> None:
     ax.tick_params(axis="x", labelrotation=rotation)
     for lbl in ax.get_xticklabels():
         lbl.set_horizontalalignment("right")
@@ -95,7 +97,7 @@ def plot_timeseries_daily_total(aggs: Aggregates, out_path: Path, rolling_days: 
     if rolling_days > 1:
         values = _rolling_mean(raw_values, window=rolling_days)
 
-    ax.plot(days, values)
+    ax.plot(days, values)  # type: ignore[arg-type]
     _set_xtick_style(ax, rotation=45)
 
     avg = sum(raw_values) / float(len(raw_values))

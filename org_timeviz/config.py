@@ -1,7 +1,7 @@
 """Define and validate YAML configuration for report generation."""
 
 from pathlib import Path
-from typing import Any, ClassVar, Literal
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, Field
@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 class _BaseConfig(BaseModel):
     """Validate YAML configuration with a strict schema."""
 
-    model_config: ClassVar[dict[str, Any]] = {"extra": "forbid"}
+    model_config = {"extra": "forbid"}
 
     @classmethod
     def validate_model(cls, data: Any) -> "_BaseConfig":

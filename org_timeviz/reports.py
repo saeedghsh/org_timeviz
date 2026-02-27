@@ -6,11 +6,12 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from .aggregate import compute_aggregates
+from .aggregate import Aggregates, compute_aggregates
 from .config import AppConfig
 from .emacs_agenda import read_agenda_files_from_emacs_init
 from .emacs_batch import parse_org_clock_records_emacs
 from .filters import apply_filters, clip_to_window
+from .models import ClockRecord
 from .plots import (
     plot_bar_by_tag,
     plot_bar_by_task,
@@ -85,7 +86,7 @@ def _set_emacs_init_env(cfg: AppConfig, preferred_init_path: Path | None) -> Non
     os.environ.pop("ORG_TIMEVIZ_TODO_KEYWORDS", None)
 
 
-def _build_aggs(cfg: AppConfig, records, window: TimeWindow):
+def _build_aggs(cfg: AppConfig, records: list[ClockRecord], window: TimeWindow) -> Aggregates:
     clipped = clip_to_window(records, window=window)
     filtered = apply_filters(clipped, cfg=cfg.reports.filters)
     return compute_aggregates(filtered)
