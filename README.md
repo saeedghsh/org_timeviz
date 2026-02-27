@@ -73,6 +73,9 @@ The code is structured so you can add features without changing the CLI or intro
 - [ ] the timeseries is nice, but maybe a representation that also
       show tasks/tags which have been the focus in each period.
 - [ ] get reports tailored to one tag or one specific task
+- [ ] visualize each task as a bar fragment, each vertical column is a
+      24-hour day, and x-axes is the time (days)
+- [ ] add an index html landing page
 
 ## License
 
