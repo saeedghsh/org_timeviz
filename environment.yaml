@@ -6,6 +6,12 @@ channels:
 
 dependencies:
   - python=3.12
+  - pylint
+  - pytest
+  - pytest-cov
+  - black
+  - isort
+  - mypy
   - pydantic>=2.11
   - pyyaml>=6.0
   - matplotlib>=3.8
