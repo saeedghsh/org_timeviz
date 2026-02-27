@@ -11,6 +11,7 @@ from .config import AppConfig
 from .emacs_agenda import read_agenda_files_from_emacs_init
 from .emacs_batch import parse_org_clock_records_emacs
 from .filters import apply_filters, clip_to_window
+from .index_html import write_index_html
 from .models import ClockRecord
 from .plots import (
     plot_bar_by_tag,
@@ -211,3 +212,6 @@ def generate_all_reports(cfg: AppConfig) -> None:
     )
 
     _LOG.info("Wrote report artifacts to %s", out_root)
+
+    index_path = write_index_html(out_root)
+    _LOG.info("Wrote index page to %s", index_path)

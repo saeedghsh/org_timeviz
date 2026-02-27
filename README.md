@@ -97,7 +97,6 @@ introducing manual steps.
 - [ ] get reports tailored to one tag or one specific task
 - [ ] visualize each task as a bar fragment, each vertical column is a 24-hour
       day, and x-axes is the time (days)
-- [ ] add an index html landing page
 - [ ] config module can be simplified
 
 ## License
