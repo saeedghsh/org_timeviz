@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterable
 
-from org_timeviz.config import FiltersConfig
-from org_timeviz.models import ClockRecord
-from org_timeviz.time_windows import TimeWindow
+from .config import FiltersConfig
+from .models import ClockRecord
+from .time_windows import TimeWindow
 
 
 @dataclass(frozen=True)

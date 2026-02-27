@@ -4,7 +4,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from org_timeviz.models import ClockRecord
+from .models import ClockRecord
 
 _LOG = logging.getLogger(__name__)
 

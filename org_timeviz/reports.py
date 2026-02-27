@@ -1,29 +1,23 @@
 """Orchestrate parsing, filtering, aggregation, and artifact generation."""
 
-from __future__ import annotations
-
-import json
 import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from org_timeviz.aggregate import compute_aggregates
-from org_timeviz.config import AppConfig
-from org_timeviz.emacs_agenda import (
-    read_agenda_files_from_emacs_init,
-    read_todo_keywords_from_emacs_init,
-)
-from org_timeviz.emacs_batch import parse_org_clock_records_emacs
-from org_timeviz.filters import apply_filters, clip_to_window
-from org_timeviz.plots import (
+from .aggregate import compute_aggregates
+from .config import AppConfig
+from .emacs_agenda import read_agenda_files_from_emacs_init
+from .emacs_batch import parse_org_clock_records_emacs
+from .filters import apply_filters, clip_to_window
+from .plots import (
     plot_bar_by_tag,
     plot_bar_by_task,
     plot_timeseries_daily_total,
     write_summary_json,
 )
-from org_timeviz.time_windows import (
+from .time_windows import (
     TimeWindow,
     at_midnight,
     iter_month_windows,

@@ -6,7 +6,7 @@ from typing import Final
 
 import matplotlib.pyplot as plt
 
-from org_timeviz.aggregate import Aggregates
+from .aggregate import Aggregates
 
 FIGSIZE: Final[tuple[float, float]] = (20.0, 12.0)
 FIGSIZE_TASK: Final[tuple[float, float]] = (20.0, 12.0)

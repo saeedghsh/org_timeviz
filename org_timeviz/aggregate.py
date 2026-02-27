@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Iterable
 
-from org_timeviz.filters import ClippedRecord
+from .filters import ClippedRecord
 
 
 @dataclass(frozen=True)
