@@ -13,6 +13,8 @@ ENV_NAME ?= $(shell awk -F: '/^name:/{gsub(/^[ \t]+/, "", $$2); print $$2; exit}
 
 CONDA ?= conda
 
+RUN_IN_CONDA_ENV = $(CONDA) run -n $(ENV_NAME) --no-capture-output
+
 .PHONY: ensure-env
 ensure-env: ## Ensure the conda env exists (create it if missing).
 	@$(CONDA) env list | awk '{print $$1}' | grep -Fxq "$(ENV_NAME)" \
@@ -21,7 +23,7 @@ ensure-env: ## Ensure the conda env exists (create it if missing).
 
 .PHONY: run
 run: ensure-env ## Run `python -m main` inside the repo conda env.
-	@$(CONDA) run -n $(ENV_NAME) --no-capture-output python -m main
+	@$(RUN_IN_CONDA_ENV) python -m main
 
 ########################################
 ###################### CONDA ENVIRONMENT
@@ -48,31 +50,31 @@ update-env: ensure-mamba ## Update the conda environment to match the repo depen
 ################### CODE QUALITY TARGETS
 ########################################
 .PHONY: test
-test:
+test: ensure-env
 	@echo "\n=== Running tests ==="
-	@pytest --cov=. --cov-report html:output/htmlcov
+	@$(RUN_IN_CONDA_ENV) pytest --cov=. --cov-report html:output/htmlcov
 
 .PHONY: coverage
-coverage:
+coverage: ensure-env
 	@echo "\n=== Generating coverage report ==="
-	@coverage report -m
+	@$(RUN_IN_CONDA_ENV) coverage report -m
 
 .PHONY: formatter
-formatter: ## Check code formatting.
+formatter: ensure-env ## Check code formatting.
 	@echo "\n=== Checking code formatting ==="
-	@black --check .
+	@$(RUN_IN_CONDA_ENV) black --check .	
 
 .PHONY: linter
-linter: ## Run the linter.
+linter: ensure-env ## Run the linter.
 	@echo "\n=== Linting Python files (all) ==="
-	@pylint $(shell git ls-files '*.py')
+	@$(RUN_IN_CONDA_ENV) pylint $(shell git ls-files '*.py')
 
 MYPY_OPTS = --install-types --non-interactive --explicit-package-bases --config-file=pyproject.toml --show-error-codes
 
 .PHONY: type-check
-type-check: ## Run static type checking.
+type-check: ensure-env ## Run static type checking.
 	@echo "\n=== Running type checks (all) ==="
-	@mypy $(MYPY_OPTS) .
+	@$(RUN_IN_CONDA_ENV) mypy $(MYPY_OPTS) .
 
 .PHONY: code-quality
 code-quality: ## Run the main code-quality checks (formatting, linting, typing).
