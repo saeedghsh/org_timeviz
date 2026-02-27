@@ -9,33 +9,66 @@ dependencies = [
   "matplotlib>=3.8",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --cov=. --cov-report=term-missing"
+python_files = ["test_*.py"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::duckdb_engine.DuckDBEngineWarning",
+]
+
+
+[tool.coverage.run]
+omit = ["*/tests/*", "*/config-3.py", "*/config.py"]
+
+[tool.pylint]
+init-hook = "import os, sys; sys.path.append(os.getcwd())"
+max-line-length = 100
+
+[tool.pylint."MESSAGES CONTROL"]
+enable = "all"
+disable = [
+    "locally-disabled",
+    "suppressed-message",
+    "duplicate-code",
+    "use-symbolic-message-instead",
+]
+
+[tool.pylint.basic]
+good-names = ["i", "j", "k", "x", "y", "z"]
+
 [tool.black]
 line-length = 100
-target-version = ["py312"]
+target-version = ['py312']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+    | \.git
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | _build
+    | buck-out
+    | build
+    | dist
+)/
+'''
 
 [tool.isort]
 profile = "black"
 line_length = 100
 
 [tool.mypy]
-python_version = "3.12"
+exclude = '^extras/|^temp/' # local folders I want to skip type checking
+ignore_missing_imports = true
+explicit_package_bases = true
 strict = true
-warn_unused_ignores = true
-warn_redundant_casts = true
+warn_unused_ignores = false # Disable warnings for unused "type: ignore"
 warn_return_any = true
-disallow_any_generics = true
-no_implicit_optional = true
-
-[tool.pylint.MASTER]
-py-version = "3.12"
-jobs = 0
-
-[tool.pylint.FORMAT]
-max-line-length = 100
-
-[tool.pylint."MESSAGES CONTROL"]
-disable = [
-  "too-few-public-methods",
-  "duplicate-code",
-  "fixme",
+disable_error_code = [
+    "type-arg", # Missing type parameters for generic type 'ndarray'
 ]
+show_error_codes = true
