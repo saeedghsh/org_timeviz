@@ -92,6 +92,48 @@ def _build_aggs(cfg: AppConfig, records: list[ClockRecord], window: TimeWindow) 
     return compute_aggregates(filtered)
 
 
+def _write_task_report(aggs: Aggregates, out_root: Path, stem: str, top_k: int) -> None:
+    """Write the task bar plot and its summary."""
+    plot_bar_by_task(aggs, out_root / f"{stem}.png", top_k=top_k)
+    write_summary_json(aggs, out_root / f"{stem}__summary.json")
+
+
+def _write_tag_report(aggs: Aggregates, out_root: Path, stem: str, top_k: int) -> None:
+    """Write the tag bar plot and its summary."""
+    plot_bar_by_tag(aggs, out_root / f"{stem}.png", top_k=top_k)
+    write_summary_json(aggs, out_root / f"{stem}__summary.json")
+
+
+def _write_task_and_tag_reports(  # pylint: disable=too-many-arguments
+    aggs: Aggregates, out_root: Path, *, period: str, label: str, top_k_tasks: int, top_k_tags: int
+) -> None:
+    """Write the paired task/tag bar reports for one window."""
+    _write_task_report(
+        aggs,
+        out_root,
+        f"by_task_{period}_{label}",
+        top_k=top_k_tasks,
+    )
+    _write_tag_report(
+        aggs,
+        out_root,
+        f"by_tags_{period}_{label}",
+        top_k=top_k_tags,
+    )
+
+
+def _write_timeseries_report(
+    aggs: Aggregates, out_root: Path, stem: str, rolling_days: int
+) -> None:
+    """Write the daily-total timeseries plot and its summary."""
+    plot_timeseries_daily_total(
+        aggs,
+        out_root / f"{stem}.png",
+        rolling_days=rolling_days,
+    )
+    write_summary_json(aggs, out_root / f"{stem}__summary.json")
+
+
 def generate_all_reports(cfg: AppConfig) -> None:
     """Generate the fixed set of reports and write artifacts under the output root."""
     now = datetime.now()
@@ -112,75 +154,60 @@ def generate_all_reports(cfg: AppConfig) -> None:
     min_dt = min(r.start for r in records)
     max_dt = max(r.end for r in records)
 
+    top_k_tasks = cfg.reports.plots.top_k_tasks
+    top_k_tags = cfg.reports.plots.top_k_tags
+
     # Fixed "last" windows.
-    w_last7 = window_last_n_days(now, 7)
-    w_last30 = window_last_n_days(now, 30)
-
-    aggs = _build_aggs(cfg, records, w_last7)
-    plot_bar_by_task(aggs, out_root / "by_task_week_last.png", top_k=cfg.reports.plots.top_k_tasks)
-    write_summary_json(aggs, out_root / "by_task_week_last__summary.json")
-    plot_bar_by_tag(aggs, out_root / "by_tags_week_last.png", top_k=cfg.reports.plots.top_k_tags)
-    write_summary_json(aggs, out_root / "by_tags_week_last__summary.json")
-
-    aggs = _build_aggs(cfg, records, w_last30)
-    plot_bar_by_task(aggs, out_root / "by_task_month_last.png", top_k=cfg.reports.plots.top_k_tasks)
-    write_summary_json(aggs, out_root / "by_task_month_last__summary.json")
-    plot_bar_by_tag(aggs, out_root / "by_tags_month_last.png", top_k=cfg.reports.plots.top_k_tags)
-    write_summary_json(aggs, out_root / "by_tags_month_last__summary.json")
-
-    # All weeks (Mon..Sun) and all months in the data range.
-    for w in iter_week_windows(min_dt, max_dt):
-        label = label_range(w)
-        aggs = _build_aggs(cfg, records, w)
-
-        plot_bar_by_task(
-            aggs,
-            out_root / f"by_task_week_{label}.png",
-            top_k=cfg.reports.plots.top_k_tasks,
+    for period, label, window in (
+        ("week", "last", window_last_n_days(now, 7)),
+        ("month", "last", window_last_n_days(now, 30)),
+    ):
+        _write_task_and_tag_reports(
+            _build_aggs(cfg, records, window),
+            out_root,
+            period=period,
+            label=label,
+            top_k_tasks=top_k_tasks,
+            top_k_tags=top_k_tags,
         )
-        write_summary_json(aggs, out_root / f"by_task_week_{label}__summary.json")
 
-        plot_bar_by_tag(
-            aggs,
-            out_root / f"by_tags_week_{label}.png",
-            top_k=cfg.reports.plots.top_k_tags,
+    # All weeks (Mon..Sun) in the data range.
+    for window in iter_week_windows(min_dt, max_dt):
+        _write_task_and_tag_reports(
+            _build_aggs(cfg, records, window),
+            out_root,
+            period="week",
+            label=label_range(window),
+            top_k_tasks=top_k_tasks,
+            top_k_tags=top_k_tags,
         )
-        write_summary_json(aggs, out_root / f"by_tags_week_{label}__summary.json")
 
-    for m in iter_month_windows(min_dt, max_dt):
-        label = label_range(m)
-        aggs = _build_aggs(cfg, records, m)
-
-        plot_bar_by_task(
-            aggs,
-            out_root / f"by_task_month_{label}.png",
-            top_k=cfg.reports.plots.top_k_tasks,
+    # All months in the data range.
+    for window in iter_month_windows(min_dt, max_dt):
+        _write_task_and_tag_reports(
+            _build_aggs(cfg, records, window),
+            out_root,
+            period="month",
+            label=label_range(window),
+            top_k_tasks=top_k_tasks,
+            top_k_tags=top_k_tags,
         )
-        write_summary_json(aggs, out_root / f"by_task_month_{label}__summary.json")
-
-        plot_bar_by_tag(
-            aggs,
-            out_root / f"by_tags_month_{label}.png",
-            top_k=cfg.reports.plots.top_k_tags,
-        )
-        write_summary_json(aggs, out_root / f"by_tags_month_{label}__summary.json")
 
     # One timeseries: last n-days if configured, else all time.
     if cfg.reports.plots.timeseries_last_n_days is None:
-        ts_start = at_midnight(min_dt)
-        ts_end = at_midnight(max_dt) + timedelta(days=1)
+        ts_window = TimeWindow(
+            name="timeseries",
+            start=at_midnight(min_dt),
+            end=at_midnight(max_dt) + timedelta(days=1),
+        )
     else:
-        ts_window = window_last_n_days(now, cfg.reports.plots.timeseries_last_n_days)
-        ts_start, ts_end = ts_window.start, ts_window.end
-
-    ts_window = TimeWindow(name="timeseries", start=ts_start, end=ts_end)
-    aggs = _build_aggs(cfg, records, ts_window)
-
-    plot_timeseries_daily_total(
-        aggs,
-        out_root / "timeseries_daily_total.png",
+        ts_cfg_window = window_last_n_days(now, cfg.reports.plots.timeseries_last_n_days)
+        ts_window = TimeWindow(name="timeseries", start=ts_cfg_window.start, end=ts_cfg_window.end)
+    _write_timeseries_report(
+        _build_aggs(cfg, records, ts_window),
+        out_root,
+        "timeseries_daily_total",
         rolling_days=cfg.reports.plots.timeseries_rolling_days,
     )
-    write_summary_json(aggs, out_root / "timeseries_daily_total__summary.json")
 
     _LOG.info("Wrote report artifacts to %s", out_root)
