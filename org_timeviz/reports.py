@@ -109,8 +109,6 @@ def generate_all_reports(cfg: AppConfig) -> None:
     out_root = Path(cfg.app.output_dir).expanduser().resolve()
     out_root.mkdir(parents=True, exist_ok=True)
 
-    plots_cfg = cfg.reports.plots
-
     min_dt = min(r.start for r in records)
     max_dt = max(r.end for r in records)
 
@@ -119,15 +117,15 @@ def generate_all_reports(cfg: AppConfig) -> None:
     w_last30 = window_last_n_days(now, 30)
 
     aggs = _build_aggs(cfg, records, w_last7)
-    plot_bar_by_task(aggs, out_root / "by_task_week_last.png", top_k=plots_cfg.top_k_tasks)
+    plot_bar_by_task(aggs, out_root / "by_task_week_last.png", top_k=cfg.reports.plots.top_k_tasks)
     write_summary_json(aggs, out_root / "by_task_week_last__summary.json")
-    plot_bar_by_tag(aggs, out_root / "by_tags_week_last.png", top_k=plots_cfg.top_k_tags)
+    plot_bar_by_tag(aggs, out_root / "by_tags_week_last.png", top_k=cfg.reports.plots.top_k_tags)
     write_summary_json(aggs, out_root / "by_tags_week_last__summary.json")
 
     aggs = _build_aggs(cfg, records, w_last30)
-    plot_bar_by_task(aggs, out_root / "by_task_month_last.png", top_k=plots_cfg.top_k_tasks)
+    plot_bar_by_task(aggs, out_root / "by_task_month_last.png", top_k=cfg.reports.plots.top_k_tasks)
     write_summary_json(aggs, out_root / "by_task_month_last__summary.json")
-    plot_bar_by_tag(aggs, out_root / "by_tags_month_last.png", top_k=plots_cfg.top_k_tags)
+    plot_bar_by_tag(aggs, out_root / "by_tags_month_last.png", top_k=cfg.reports.plots.top_k_tags)
     write_summary_json(aggs, out_root / "by_tags_month_last__summary.json")
 
     # All weeks (Mon..Sun) and all months in the data range.
@@ -138,14 +136,14 @@ def generate_all_reports(cfg: AppConfig) -> None:
         plot_bar_by_task(
             aggs,
             out_root / f"by_task_week_{label}.png",
-            top_k=plots_cfg.top_k_tasks,
+            top_k=cfg.reports.plots.top_k_tasks,
         )
         write_summary_json(aggs, out_root / f"by_task_week_{label}__summary.json")
 
         plot_bar_by_tag(
             aggs,
             out_root / f"by_tags_week_{label}.png",
-            top_k=plots_cfg.top_k_tags,
+            top_k=cfg.reports.plots.top_k_tags,
         )
         write_summary_json(aggs, out_root / f"by_tags_week_{label}__summary.json")
 
@@ -156,23 +154,23 @@ def generate_all_reports(cfg: AppConfig) -> None:
         plot_bar_by_task(
             aggs,
             out_root / f"by_task_month_{label}.png",
-            top_k=plots_cfg.top_k_tasks,
+            top_k=cfg.reports.plots.top_k_tasks,
         )
         write_summary_json(aggs, out_root / f"by_task_month_{label}__summary.json")
 
         plot_bar_by_tag(
             aggs,
             out_root / f"by_tags_month_{label}.png",
-            top_k=plots_cfg.top_k_tags,
+            top_k=cfg.reports.plots.top_k_tags,
         )
         write_summary_json(aggs, out_root / f"by_tags_month_{label}__summary.json")
 
     # One timeseries: last n-days if configured, else all time.
-    if plots_cfg.timeseries_last_n_days is None:
+    if cfg.reports.plots.timeseries_last_n_days is None:
         ts_start = at_midnight(min_dt)
         ts_end = at_midnight(max_dt) + timedelta(days=1)
     else:
-        ts_window = window_last_n_days(now, plots_cfg.timeseries_last_n_days)
+        ts_window = window_last_n_days(now, cfg.reports.plots.timeseries_last_n_days)
         ts_start, ts_end = ts_window.start, ts_window.end
 
     ts_window = TimeWindow(name="timeseries", start=ts_start, end=ts_end)
@@ -181,7 +179,7 @@ def generate_all_reports(cfg: AppConfig) -> None:
     plot_timeseries_daily_total(
         aggs,
         out_root / "timeseries_daily_total.png",
-        rolling_days=plots_cfg.timeseries_rolling_days,
+        rolling_days=cfg.reports.plots.timeseries_rolling_days,
     )
     write_summary_json(aggs, out_root / "timeseries_daily_total__summary.json")
 

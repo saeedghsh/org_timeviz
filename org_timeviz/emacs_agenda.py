@@ -36,7 +36,7 @@ def read_agenda_files_from_emacs_init(
     return EmacsAgendaFilesResult(files=files, source_path=init_path)
 
 
-def _find_setq_block(text: str, var_name: str) -> str | None:
+def _find_setq_block(text: str, var_name: str) -> str | None:  # pylint: disable=too-many-branches
     # Find the actual (setq <var_name> ...) form, not just any mention of var_name.
     pattern = re.compile(r"\(\s*setq\s+" + re.escape(var_name) + r"\b", flags=re.MULTILINE)
 
@@ -81,7 +81,7 @@ def _find_setq_block(text: str, var_name: str) -> str | None:
             depth += 1
         elif ch == ")":
             depth -= 1
-            if depth == 0:
+            if not depth:
                 end_idx = i + 1
                 break
 

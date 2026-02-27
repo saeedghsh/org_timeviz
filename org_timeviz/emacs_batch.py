@@ -1,3 +1,5 @@
+"""Util for parsing clock records using Emacs in batch mode."""
+
 import json
 import logging
 import subprocess
@@ -38,7 +40,7 @@ def parse_org_clock_records_emacs(org_files: list[Path]) -> list[ClockRecord]:
         encoding="utf-8",
     )
 
-    if res.returncode != 0:
+    if res.returncode:
         raise RuntimeError(
             "Emacs batch parser failed.\n"
             f"cmd: {cmd}\n"
