@@ -36,7 +36,7 @@ class OrgSourcesConfig(_BaseConfig):
     """Describe how to locate Org files for reporting."""
 
     mode: Literal["emacs", "explicit"] = Field(default="emacs")
-    emacs_init_paths: list[str] = Field(default_factory=lambda: ["~/.emacs", "~/.emacs.d/init.el"])
+    emacs_init_paths: list[str]
     emacs_agenda_var: str = Field(default="org-agenda-files")
     explicit_files: list[str] = Field(default_factory=list)
 

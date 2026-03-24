@@ -7,6 +7,7 @@ org_sources:
   emacs_init_paths:
     - "~/.emacs"
     - "~/.emacs.d/init.el"
+    - "~/.emacs.d/lisp/init-org.el"
   emacs_agenda_var: org-agenda-files
   explicit_files: []
 
