@@ -69,7 +69,7 @@ plot also has a matching JSON summary next to it.
   * `by_task_month_YYYY-MM-DD_to_YYYY-MM-DD.png` for each calendar month in the
     data range
   * same pattern for `by_tags_*`
-* Timeseries:
+* time series:
   * `timeseries_daily_total.png` and `timeseries_daily_total__summary.json`
     (last N days if configured, otherwise all time), including a dashed
     horizontal average line
@@ -88,15 +88,18 @@ introducing manual steps.
   * add booleans under `reports.plots` (or a new `reports.enabled` section) and
     gate calls in `reports.py`
 
-
 ## Laundry List
 
+- [ ] plots "by tag" must be only for tags that are exclusive, otherwise it
+  doesn't give a meaningful sense of time.
+- [ ] Clean up `outputs/`: move everything (except `index.html`) under
+      `outputs/` to `outputs/assets`
+- [ ] sort under each heading by "last", "most_recent", "most_recent - 1", ...
+  Right now it is "last", "first_ever", "first_ever + 1", ...
 - [ ] filter "by task" by hierarchy level.
 - [ ] the timeseries is nice, but maybe a representation that also show
       tasks/tags which have been the focus in each period.
 - [ ] get reports tailored to one tag or one specific task
-- [ ] visualize each task as a bar fragment, each vertical column is a 24-hour
-      day, and x-axes is the time (days)
 - [ ] config module can be simplified
 
 ## License

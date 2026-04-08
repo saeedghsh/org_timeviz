@@ -7,10 +7,11 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from .aggregate import Aggregates, compute_aggregates
+from .calendar_view import plot_calendar_view
 from .config import AppConfig
 from .emacs_agenda import read_agenda_files_from_emacs_init
 from .emacs_batch import parse_org_clock_records_emacs
-from .filters import apply_filters, clip_to_window
+from .filters import ClippedRecord, apply_filters, clip_to_window
 from .index_html import write_index_html
 from .models import ClockRecord
 from .plots import (
@@ -74,23 +75,29 @@ def _set_emacs_init_env(cfg: AppConfig, preferred_init_path: Path | None) -> Non
         if pp.exists() and pp not in candidates:
             candidates.append(pp)
 
-    # Prefer the first existing candidate; Emacs/Elisp will read it robustly.
     for init_path in candidates:
         if init_path.exists():
             os.environ["ORG_TIMEVIZ_EMACS_INIT"] = str(init_path)
-            # Ensure no stale override remains.
             os.environ.pop("ORG_TIMEVIZ_TODO_KEYWORDS", None)
             return
 
-    # If nothing found, unset it (exporter will just not customize todo keywords).
     os.environ.pop("ORG_TIMEVIZ_EMACS_INIT", None)
     os.environ.pop("ORG_TIMEVIZ_TODO_KEYWORDS", None)
 
 
-def _build_aggs(cfg: AppConfig, records: list[ClockRecord], window: TimeWindow) -> Aggregates:
+def _build_filtered_records(
+    cfg: AppConfig,
+    records: list[ClockRecord],
+    window: TimeWindow,
+) -> list[ClippedRecord]:
+    """Clip records to a time window and apply report filters."""
     clipped = clip_to_window(records, window=window)
-    filtered = apply_filters(clipped, cfg=cfg.reports.filters)
-    return compute_aggregates(filtered)
+    return apply_filters(clipped, cfg=cfg.reports.filters)
+
+
+def _build_aggs_from_filtered(records: list[ClippedRecord]) -> Aggregates:
+    """Compute aggregates from already-filtered clipped records."""
+    return compute_aggregates(records)
 
 
 def _write_task_report(aggs: Aggregates, out_root: Path, stem: str, top_k: int) -> None:
@@ -105,10 +112,38 @@ def _write_tag_report(aggs: Aggregates, out_root: Path, stem: str, top_k: int) -
     write_summary_json(aggs, out_root / f"{stem}__summary.json")
 
 
-def _write_task_and_tag_reports(  # pylint: disable=too-many-arguments
-    aggs: Aggregates, out_root: Path, *, period: str, label: str, top_k_tasks: int, top_k_tags: int
+def _write_calendar_report(
+    filtered_records: list[ClippedRecord],
+    aggs: Aggregates,
+    out_root: Path,
+    *,
+    period: str,
+    label: str,
+    top_k_tasks: int,
 ) -> None:
-    """Write the paired task/tag bar reports for one window."""
+    """Write the calendar-like day/time plot and its summary."""
+    stem = f"calendar_{period}_{label}"
+    title = f"Calendar view ({period}: {label})"
+    plot_calendar_view(
+        filtered_records,
+        out_root / f"{stem}.png",
+        title=title,
+        top_k_tasks=top_k_tasks,
+    )
+    write_summary_json(aggs, out_root / f"{stem}__summary.json")
+
+
+def _write_window_reports(
+    filtered_records: list[ClippedRecord],
+    aggs: Aggregates,
+    out_root: Path,
+    *,
+    period: str,
+    label: str,
+    top_k_tasks: int,
+    top_k_tags: int,
+) -> None:
+    """Write task, tag, and calendar reports for one window."""
     _write_task_report(
         aggs,
         out_root,
@@ -120,6 +155,14 @@ def _write_task_and_tag_reports(  # pylint: disable=too-many-arguments
         out_root,
         f"by_tags_{period}_{label}",
         top_k=top_k_tags,
+    )
+    _write_calendar_report(
+        filtered_records,
+        aggs,
+        out_root,
+        period=period,
+        label=label,
+        top_k_tasks=top_k_tasks,
     )
 
 
@@ -158,13 +201,15 @@ def generate_all_reports(cfg: AppConfig) -> None:
     top_k_tasks = cfg.reports.plots.top_k_tasks
     top_k_tags = cfg.reports.plots.top_k_tags
 
-    # Fixed "last" windows.
     for period, label, window in (
         ("week", "last", window_last_n_days(now, 7)),
         ("month", "last", window_last_n_days(now, 30)),
     ):
-        _write_task_and_tag_reports(
-            _build_aggs(cfg, records, window),
+        filtered_records = _build_filtered_records(cfg, records, window)
+        aggs = _build_aggs_from_filtered(filtered_records)
+        _write_window_reports(
+            filtered_records,
+            aggs,
             out_root,
             period=period,
             label=label,
@@ -172,10 +217,12 @@ def generate_all_reports(cfg: AppConfig) -> None:
             top_k_tags=top_k_tags,
         )
 
-    # All weeks (Mon..Sun) in the data range.
     for window in iter_week_windows(min_dt, max_dt):
-        _write_task_and_tag_reports(
-            _build_aggs(cfg, records, window),
+        filtered_records = _build_filtered_records(cfg, records, window)
+        aggs = _build_aggs_from_filtered(filtered_records)
+        _write_window_reports(
+            filtered_records,
+            aggs,
             out_root,
             period="week",
             label=label_range(window),
@@ -183,10 +230,12 @@ def generate_all_reports(cfg: AppConfig) -> None:
             top_k_tags=top_k_tags,
         )
 
-    # All months in the data range.
     for window in iter_month_windows(min_dt, max_dt):
-        _write_task_and_tag_reports(
-            _build_aggs(cfg, records, window),
+        filtered_records = _build_filtered_records(cfg, records, window)
+        aggs = _build_aggs_from_filtered(filtered_records)
+        _write_window_reports(
+            filtered_records,
+            aggs,
             out_root,
             period="month",
             label=label_range(window),
@@ -194,7 +243,6 @@ def generate_all_reports(cfg: AppConfig) -> None:
             top_k_tags=top_k_tags,
         )
 
-    # One timeseries: last n-days if configured, else all time.
     if cfg.reports.plots.timeseries_last_n_days is None:
         ts_window = TimeWindow(
             name="timeseries",
@@ -204,8 +252,10 @@ def generate_all_reports(cfg: AppConfig) -> None:
     else:
         ts_cfg_window = window_last_n_days(now, cfg.reports.plots.timeseries_last_n_days)
         ts_window = TimeWindow(name="timeseries", start=ts_cfg_window.start, end=ts_cfg_window.end)
+
+    ts_records = _build_filtered_records(cfg, records, ts_window)
     _write_timeseries_report(
-        _build_aggs(cfg, records, ts_window),
+        _build_aggs_from_filtered(ts_records),
         out_root,
         "timeseries_daily_total",
         rolling_days=cfg.reports.plots.timeseries_rolling_days,

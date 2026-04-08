@@ -15,6 +15,7 @@ class _PlotItem:
 
 _BY_TASK_RE = re.compile(r"^by_task_(?P<period>week|month)_(?P<label>.+)\.png$")
 _BY_TAGS_RE = re.compile(r"^by_tags_(?P<period>week|month)_(?P<label>.+)\.png$")
+_CALENDAR_RE = re.compile(r"^calendar_(?P<period>week|month)_(?P<label>.+)\.png$")
 _RANGE_LABEL_RE = re.compile(r"^(?P<start>\d{4}-\d{2}-\d{2})_to_(?P<end>\d{4}-\d{2}-\d{2})$")
 
 
@@ -29,7 +30,6 @@ def _summary_for_png(out_dir: Path, png_name: str) -> str | None:
 
 
 def _label_sort_key(label: str) -> tuple[int, str]:
-    # "last" first, then chronological by start date if possible, else lexicographic.
     if label == "last":
         return (0, "")
     m = _RANGE_LABEL_RE.match(label)
@@ -81,6 +81,8 @@ def write_index_html(out_dir: Path) -> Path:
     by_task_month: list[tuple[str, _PlotItem]] = []
     by_tags_week: list[tuple[str, _PlotItem]] = []
     by_tags_month: list[tuple[str, _PlotItem]] = []
+    calendar_week: list[tuple[str, _PlotItem]] = []
+    calendar_month: list[tuple[str, _PlotItem]] = []
     other: list[_PlotItem] = []
 
     for png in pngs:
@@ -110,12 +112,24 @@ def write_index_html(out_dir: Path) -> Path:
                 by_tags_month.append((label, item))
             continue
 
+        m = _CALENDAR_RE.match(png)
+        if m:
+            period = m.group("period")
+            label = m.group("label")
+            if period == "week":
+                calendar_week.append((label, item))
+            else:
+                calendar_month.append((label, item))
+            continue
+
         other.append(item)
 
     by_task_week.sort(key=lambda x: _label_sort_key(x[0]))
     by_task_month.sort(key=lambda x: _label_sort_key(x[0]))
     by_tags_week.sort(key=lambda x: _label_sort_key(x[0]))
     by_tags_month.sort(key=lambda x: _label_sort_key(x[0]))
+    calendar_week.sort(key=lambda x: _label_sort_key(x[0]))
+    calendar_month.sort(key=lambda x: _label_sort_key(x[0]))
 
     html_text = """\
 <!doctype html>
@@ -145,6 +159,8 @@ def write_index_html(out_dir: Path) -> Path:
   %s
 
   %s
+
+  %s
 </body>
 </html>
 """ % (
@@ -153,6 +169,8 @@ def write_index_html(out_dir: Path) -> Path:
         + _section("by_task / month", [it for _, it in by_task_month]),
         _section("by_tags / week", [it for _, it in by_tags_week])
         + _section("by_tags / month", [it for _, it in by_tags_month]),
+        _section("calendar / week", [it for _, it in calendar_week])
+        + _section("calendar / month", [it for _, it in calendar_month]),
         _section("other", other),
     )
 
