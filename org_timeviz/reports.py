@@ -30,6 +30,7 @@ from .time_windows import (
 )
 
 _LOG = logging.getLogger(__name__)
+ASSETS_DIR_NAME = "assets"
 
 
 @dataclass(frozen=True)
@@ -100,22 +101,22 @@ def _build_aggs_from_filtered(records: list[ClippedRecord]) -> Aggregates:
     return compute_aggregates(records)
 
 
-def _write_task_report(aggs: Aggregates, out_root: Path, stem: str, top_k: int) -> None:
+def _write_task_report(aggs: Aggregates, assets_root: Path, stem: str, top_k: int) -> None:
     """Write the task bar plot and its summary."""
-    plot_bar_by_task(aggs, out_root / f"{stem}.png", top_k=top_k)
-    write_summary_json(aggs, out_root / f"{stem}__summary.json")
+    plot_bar_by_task(aggs, assets_root / f"{stem}.png", top_k=top_k)
+    write_summary_json(aggs, assets_root / f"{stem}__summary.json")
 
 
-def _write_tag_report(aggs: Aggregates, out_root: Path, stem: str, top_k: int) -> None:
+def _write_tag_report(aggs: Aggregates, assets_root: Path, stem: str, top_k: int) -> None:
     """Write the tag bar plot and its summary."""
-    plot_bar_by_tag(aggs, out_root / f"{stem}.png", top_k=top_k)
-    write_summary_json(aggs, out_root / f"{stem}__summary.json")
+    plot_bar_by_tag(aggs, assets_root / f"{stem}.png", top_k=top_k)
+    write_summary_json(aggs, assets_root / f"{stem}__summary.json")
 
 
 def _write_calendar_report(
     filtered_records: list[ClippedRecord],
     aggs: Aggregates,
-    out_root: Path,
+    assets_root: Path,
     *,
     period: str,
     label: str,
@@ -126,17 +127,17 @@ def _write_calendar_report(
     title = f"Calendar view ({period}: {label})"
     plot_calendar_view(
         filtered_records,
-        out_root / f"{stem}.png",
+        assets_root / f"{stem}.png",
         title=title,
         top_k_tasks=top_k_tasks,
     )
-    write_summary_json(aggs, out_root / f"{stem}__summary.json")
+    write_summary_json(aggs, assets_root / f"{stem}__summary.json")
 
 
 def _write_window_reports(
     filtered_records: list[ClippedRecord],
     aggs: Aggregates,
-    out_root: Path,
+    assets_root: Path,
     *,
     period: str,
     label: str,
@@ -146,20 +147,20 @@ def _write_window_reports(
     """Write task, tag, and calendar reports for one window."""
     _write_task_report(
         aggs,
-        out_root,
+        assets_root,
         f"by_task_{period}_{label}",
         top_k=top_k_tasks,
     )
     _write_tag_report(
         aggs,
-        out_root,
+        assets_root,
         f"by_tags_{period}_{label}",
         top_k=top_k_tags,
     )
     _write_calendar_report(
         filtered_records,
         aggs,
-        out_root,
+        assets_root,
         period=period,
         label=label,
         top_k_tasks=top_k_tasks,
@@ -167,15 +168,15 @@ def _write_window_reports(
 
 
 def _write_timeseries_report(
-    aggs: Aggregates, out_root: Path, stem: str, rolling_days: int
+    aggs: Aggregates, assets_root: Path, stem: str, rolling_days: int
 ) -> None:
     """Write the daily-total timeseries plot and its summary."""
     plot_timeseries_daily_total(
         aggs,
-        out_root / f"{stem}.png",
+        assets_root / f"{stem}.png",
         rolling_days=rolling_days,
     )
-    write_summary_json(aggs, out_root / f"{stem}__summary.json")
+    write_summary_json(aggs, assets_root / f"{stem}__summary.json")
 
 
 def generate_all_reports(cfg: AppConfig) -> None:
@@ -193,7 +194,9 @@ def generate_all_reports(cfg: AppConfig) -> None:
         return
 
     out_root = Path(cfg.app.output_dir).expanduser().resolve()
+    assets_root = out_root / ASSETS_DIR_NAME
     out_root.mkdir(parents=True, exist_ok=True)
+    assets_root.mkdir(parents=True, exist_ok=True)
 
     min_dt = min(r.start for r in records)
     max_dt = max(r.end for r in records)
@@ -210,7 +213,7 @@ def generate_all_reports(cfg: AppConfig) -> None:
         _write_window_reports(
             filtered_records,
             aggs,
-            out_root,
+            assets_root,
             period=period,
             label=label,
             top_k_tasks=top_k_tasks,
@@ -223,7 +226,7 @@ def generate_all_reports(cfg: AppConfig) -> None:
         _write_window_reports(
             filtered_records,
             aggs,
-            out_root,
+            assets_root,
             period="week",
             label=label_range(window),
             top_k_tasks=top_k_tasks,
@@ -236,7 +239,7 @@ def generate_all_reports(cfg: AppConfig) -> None:
         _write_window_reports(
             filtered_records,
             aggs,
-            out_root,
+            assets_root,
             period="month",
             label=label_range(window),
             top_k_tasks=top_k_tasks,
@@ -256,12 +259,12 @@ def generate_all_reports(cfg: AppConfig) -> None:
     ts_records = _build_filtered_records(cfg, records, ts_window)
     _write_timeseries_report(
         _build_aggs_from_filtered(ts_records),
-        out_root,
+        assets_root,
         "timeseries_daily_total",
         rolling_days=cfg.reports.plots.timeseries_rolling_days,
     )
 
-    _LOG.info("Wrote report artifacts to %s", out_root)
+    _LOG.info("Wrote report artifacts to %s", assets_root)
 
-    index_path = write_index_html(out_root)
+    index_path = write_index_html(out_root=out_root, assets_dir=assets_root)
     _LOG.info("Wrote index page to %s", index_path)

@@ -19,13 +19,13 @@ _CALENDAR_RE = re.compile(r"^calendar_(?P<period>week|month)_(?P<label>.+)\.png$
 _RANGE_LABEL_RE = re.compile(r"^(?P<start>\d{4}-\d{2}-\d{2})_to_(?P<end>\d{4}-\d{2}-\d{2})$")
 
 
-def _discover_pngs(out_dir: Path) -> list[str]:
-    return sorted([p.name for p in out_dir.glob("*.png")])
+def _discover_pngs(assets_dir: Path) -> list[str]:
+    return sorted([p.name for p in assets_dir.glob("*.png")])
 
 
-def _summary_for_png(out_dir: Path, png_name: str) -> str | None:
+def _summary_for_png(assets_dir: Path, png_name: str) -> str | None:
     stem = png_name[:-4]
-    candidate = out_dir / f"{stem}__summary.json"
+    candidate = assets_dir / f"{stem}__summary.json"
     return candidate.name if candidate.exists() else None
 
 
@@ -38,28 +38,32 @@ def _label_sort_key(label: str) -> tuple[int, str]:
     return (2, label)
 
 
-def _wrap_item(item: _PlotItem) -> str:
-    png_esc = html.escape(item.png_name)
+def _wrap_item(item: _PlotItem, asset_prefix: str) -> str:
+    png_href = f"{asset_prefix}/{item.png_name}"
+    png_href_esc = html.escape(png_href)
+    png_name_esc = html.escape(item.png_name)
+
     summ = ""
     if item.summary_name is not None:
-        summ_esc = html.escape(item.summary_name)
-        summ = f' - <a href="{summ_esc}">summary</a>'
+        summ_href = f"{asset_prefix}/{item.summary_name}"
+        summ_href_esc = html.escape(summ_href)
+        summ = f' - <a href="{summ_href_esc}">summary</a>'
 
     return (
         "<li>"
-        f"<details><summary>{png_esc}</summary>"
-        f'<div class="links"><a href="{png_esc}">open image</a>{summ}</div>'
-        f'<img class="plot" src="{png_esc}" loading="lazy" />'
+        f"<details><summary>{png_name_esc}</summary>"
+        f'<div class="links"><a href="{png_href_esc}">open image</a>{summ}</div>'
+        f'<img class="plot" src="{png_href_esc}" loading="lazy" />'
         "</details>"
         "</li>"
     )
 
 
-def _section(title: str, items: Iterable[_PlotItem]) -> str:
+def _section(title: str, items: Iterable[_PlotItem], asset_prefix: str) -> str:
     items_list = list(items)
     if not items_list:
         return ""
-    body = "\n".join(_wrap_item(it) for it in items_list)
+    body = "\n".join(_wrap_item(it, asset_prefix=asset_prefix) for it in items_list)
     title_esc = html.escape(title)
     return (
         f"<details open>\n<summary>{title_esc} ({len(items_list)})</summary>\n"
@@ -70,11 +74,13 @@ def _section(title: str, items: Iterable[_PlotItem]) -> str:
     )
 
 
-def write_index_html(out_dir: Path) -> Path:
-    """Write outputs/index.html describing the current plot artifacts."""
-    out_dir.mkdir(parents=True, exist_ok=True)
+def write_index_html(out_root: Path, assets_dir: Path) -> Path:
+    """Write outputs/index.html describing artifacts stored under outputs/assets."""
+    out_root.mkdir(parents=True, exist_ok=True)
+    assets_dir.mkdir(parents=True, exist_ok=True)
 
-    pngs = _discover_pngs(out_dir)
+    pngs = _discover_pngs(assets_dir)
+    asset_prefix = html.escape(assets_dir.name)
 
     timeseries: list[_PlotItem] = []
     by_task_week: list[tuple[str, _PlotItem]] = []
@@ -86,7 +92,7 @@ def write_index_html(out_dir: Path) -> Path:
     other: list[_PlotItem] = []
 
     for png in pngs:
-        item = _PlotItem(png_name=png, summary_name=_summary_for_png(out_dir, png))
+        item = _PlotItem(png_name=png, summary_name=_summary_for_png(assets_dir, png))
 
         if png.startswith("timeseries_"):
             timeseries.append(item)
@@ -164,16 +170,16 @@ def write_index_html(out_dir: Path) -> Path:
 </body>
 </html>
 """ % (
-        _section("timeseries", timeseries),
-        _section("by_task / week", [it for _, it in by_task_week])
-        + _section("by_task / month", [it for _, it in by_task_month]),
-        _section("by_tags / week", [it for _, it in by_tags_week])
-        + _section("by_tags / month", [it for _, it in by_tags_month]),
-        _section("calendar / week", [it for _, it in calendar_week])
-        + _section("calendar / month", [it for _, it in calendar_month]),
-        _section("other", other),
+        _section("timeseries", timeseries, asset_prefix),
+        _section("by_task / week", [it for _, it in by_task_week], asset_prefix)
+        + _section("by_task / month", [it for _, it in by_task_month], asset_prefix),
+        _section("by_tags / week", [it for _, it in by_tags_week], asset_prefix)
+        + _section("by_tags / month", [it for _, it in by_tags_month], asset_prefix),
+        _section("calendar / week", [it for _, it in calendar_week], asset_prefix)
+        + _section("calendar / month", [it for _, it in calendar_month], asset_prefix),
+        _section("other", other, asset_prefix),
     )
 
-    index_path = out_dir / "index.html"
+    index_path = out_root / "index.html"
     index_path.write_text(html_text, encoding="utf-8")
     return index_path

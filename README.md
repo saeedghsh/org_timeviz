@@ -92,8 +92,6 @@ introducing manual steps.
 
 - [ ] plots "by tag" must be only for tags that are exclusive, otherwise it
   doesn't give a meaningful sense of time.
-- [ ] Clean up `outputs/`: move everything (except `index.html`) under
-      `outputs/` to `outputs/assets`
 - [ ] sort under each heading by "last", "most_recent", "most_recent - 1", ...
   Right now it is "last", "first_ever", "first_ever + 1", ...
 - [ ] filter "by task" by hierarchy level.
