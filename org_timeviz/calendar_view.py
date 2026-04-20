@@ -84,7 +84,16 @@ def plot_calendar_view(
         return
 
     slices.sort(key=lambda item: (item.day, item.start_minute, item.end_minute, item.task))
-    days = sorted({item.day for item in slices})
+    unique_days = sorted({item.day for item in slices})
+    if unique_days:
+        first_day = unique_days[0]
+        last_day = unique_days[-1]
+        days = [
+            first_day + timedelta(days=offset) for offset in range((last_day - first_day).days + 1)
+        ]
+    else:
+        days = []
+
     day_to_x = {day: index for index, day in enumerate(days)}
 
     grouped_task_names, color_by_task = _task_groups_and_colors(
