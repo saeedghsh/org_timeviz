@@ -20,6 +20,11 @@ from .plots import (
     plot_timeseries_daily_total,
     write_summary_json,
 )
+from .time_buckets import (
+    compute_monthly_time_buckets,
+    plot_monthly_time_buckets,
+    write_monthly_time_buckets_summary_json,
+)
 from .time_windows import (
     TimeWindow,
     at_midnight,
@@ -179,6 +184,14 @@ def _write_timeseries_report(
     write_summary_json(aggs, assets_root / f"{stem}__summary.json")
 
 
+def _write_time_buckets_report(filtered_records: list[ClippedRecord], assets_root: Path) -> None:
+    """Write the monthly time-bucket plot and its summary."""
+    stem = "time_buckets_monthly"
+    report = compute_monthly_time_buckets(filtered_records)
+    plot_monthly_time_buckets(report, assets_root / f"{stem}.png")
+    write_monthly_time_buckets_summary_json(report, assets_root / f"{stem}__summary.json")
+
+
 def generate_all_reports(cfg: AppConfig) -> None:
     """Generate the fixed set of reports and write artifacts under the output root."""
     now = datetime.now()
@@ -263,6 +276,14 @@ def generate_all_reports(cfg: AppConfig) -> None:
         "timeseries_daily_total",
         rolling_days=cfg.reports.plots.timeseries_rolling_days,
     )
+
+    all_time_window = TimeWindow(
+        name="all_time",
+        start=at_midnight(min_dt),
+        end=at_midnight(max_dt) + timedelta(days=1),
+    )
+    all_time_records = _build_filtered_records(cfg, records, all_time_window)
+    _write_time_buckets_report(all_time_records, assets_root)
 
     _LOG.info("Wrote report artifacts to %s", assets_root)
 

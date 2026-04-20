@@ -17,6 +17,7 @@ _BY_TASK_RE = re.compile(r"^by_task_(?P<period>week|month)_(?P<label>.+)\.png$")
 _BY_TAGS_RE = re.compile(r"^by_tags_(?P<period>week|month)_(?P<label>.+)\.png$")
 _CALENDAR_RE = re.compile(r"^calendar_(?P<period>week|month)_(?P<label>.+)\.png$")
 _RANGE_LABEL_RE = re.compile(r"^(?P<start>\d{4}-\d{2}-\d{2})_to_(?P<end>\d{4}-\d{2}-\d{2})$")
+_TIME_BUCKETS_RE = re.compile(r"^time_buckets_(?P<label>.+)\.png$")
 
 
 def _discover_pngs(assets_dir: Path) -> list[str]:
@@ -89,6 +90,7 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
     by_tags_month: list[tuple[str, _PlotItem]] = []
     calendar_week: list[tuple[str, _PlotItem]] = []
     calendar_month: list[tuple[str, _PlotItem]] = []
+    time_buckets: list[_PlotItem] = []
     other: list[_PlotItem] = []
 
     for png in pngs:
@@ -126,6 +128,11 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
                 calendar_week.append((label, item))
             else:
                 calendar_month.append((label, item))
+            continue
+
+        m = _TIME_BUCKETS_RE.match(png)
+        if m:
+            time_buckets.append(item)
             continue
 
         other.append(item)
@@ -167,6 +174,8 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
   %s
 
   %s
+
+  %s
 </body>
 </html>
 """ % (
@@ -177,6 +186,7 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
         + _section("by_tags / month", [it for _, it in by_tags_month], asset_prefix),
         _section("calendar / week", [it for _, it in calendar_week], asset_prefix)
         + _section("calendar / month", [it for _, it in calendar_month], asset_prefix),
+        _section("time buckets", time_buckets, asset_prefix),
         _section("other", other, asset_prefix),
     )
 
