@@ -14,8 +14,8 @@ from matplotlib.patches import Patch, Rectangle
 
 from .filters import ClippedRecord
 
-FIGURE_HEIGHT: Final[float] = 12.0
-MIN_FIGURE_WIDTH: Final[float] = 12.0
+FIGURE_HEIGHT: Final[float] = 8.0
+MIN_FIGURE_WIDTH: Final[float] = 16.0
 WIDTH_PER_DAY: Final[float] = 0.65
 COLUMN_WIDTH: Final[float] = 0.9
 OTHERS_LABEL: Final[str] = "(others)"
@@ -118,7 +118,8 @@ def plot_calendar_view(
 
     ax.set_xticks(list(range(len(days))))
     ax.set_xticklabels([_format_day_label(day) for day in days])
-    _set_xtick_style(ax, rotation=45)
+    _set_xtick_style(ax, rotation=90)
+
     _set_hour_ticks(ax)
     ax.grid(axis="y", linestyle=":", linewidth=0.5, color="0.80")
 
@@ -182,7 +183,7 @@ def _task_groups_and_colors(
 
 def _format_day_label(day: date) -> str:
     """Format a compact day label for the x-axis."""
-    return day.strftime("%Y-%m-%d\n%a")
+    return day.strftime("%a / %Y-%m-%d")
 
 
 def _legend_label(task_name: str) -> str:
