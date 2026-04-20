@@ -67,7 +67,7 @@ def _section(title: str, items: Iterable[_PlotItem], asset_prefix: str) -> str:
     body = "\n".join(_wrap_item(it, asset_prefix=asset_prefix) for it in items_list)
     title_esc = html.escape(title)
     return (
-        f"<details open>\n<summary>{title_esc} ({len(items_list)})</summary>\n"
+        f"<details>\n<summary>{title_esc} ({len(items_list)})</summary>\n"
         "<ul>\n"
         f"{body}\n"
         "</ul>\n"
