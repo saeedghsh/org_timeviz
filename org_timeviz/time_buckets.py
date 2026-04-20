@@ -164,12 +164,13 @@ def _bucket_for_tags(tags: tuple[str, ...]) -> str:
     if len(matched_buckets) == 1:
         return next(iter(matched_buckets))
 
+    # TODO: raise again after fixed multiple tags per tasks issue
     # this will not allow more than one time-bucket over one task
-    raise ValueError(
-        "Expected at most one time-bucket tag per task, but found: "
-        + ", ".join(sorted(matched_buckets))
-    )
-    # return next(iter(matched_buckets))
+    # raise ValueError(
+    #     "Expected at most one time-bucket tag per task, but found: "
+    #     + ", ".join(sorted(matched_buckets))
+    # )
+    return next(iter(matched_buckets))
 
 
 def _split_record_across_months(record: ClippedRecord) -> list[tuple[date, int]]:
