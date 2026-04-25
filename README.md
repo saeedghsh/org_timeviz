@@ -190,11 +190,8 @@ clear and configurable reporting view of time allocation.
 
 - [ ] sort under each heading by "last", "most_recent", "most_recent - 1", ...
   Right now it is "last", "first_ever", "first_ever + 1", ...
-- [ ] filter "by task" by hierarchy level.
 - [ ] the timeseries is nice, but maybe a representation that also show
       tasks/tags which have been the focus in each period.
-- [ ] get reports tailored to one tag or one specific task
-- [ ] config module can be simplified
 
 ## License
 

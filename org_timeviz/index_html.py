@@ -37,12 +37,17 @@ def _summary_for_png(assets_dir: Path, png_name: str) -> str | None:
     return candidate.name if candidate.exists() else None
 
 
-def _label_sort_key(label: str) -> tuple[int, str]:
+def _label_sort_key(label: str) -> tuple[int, int | str]:
     if label == "last":
-        return (0, "")
+        return (0, 0)
+
     match_obj = _RANGE_LABEL_RE.match(label)
     if match_obj:
-        return (1, match_obj.group("start"))
+        start_date = match_obj.group("start")
+        year_str, month_str, day_str = start_date.split("-")
+        ordinal = int(year_str) * 10000 + int(month_str) * 100 + int(day_str)
+        return (1, -ordinal)
+
     return (2, label)
 
 
