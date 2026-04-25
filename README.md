@@ -88,6 +88,121 @@ introducing manual steps.
   * add booleans under `reports.plots` (or a new `reports.enabled` section) and
     gate calls in `reports.py`
 
+
+## Time buckets from tags
+
+This project can use Org tags not only as semantic metadata, but also as inputs for
+time-bucket reporting.
+
+The idea is simple:
+
+* tasks keep their normal tags
+* some tags are also recognized as "time-bucket tags"
+* those tags are mapped to canonical reporting buckets through
+  `time_buckets.tag_to_bucket`
+* the monthly time-bucket report aggregates clocked time using those mapped
+  buckets
+
+This is a retrofit-friendly design. It lets tags continue to describe the task,
+while also making it possible to produce higher-level time-allocation reports.
+
+A task does not need to have a time-bucket tag. If none of its tags map to a
+configured time bucket, its time is assigned to the configured `other_bucket`.
+
+Multiple tags may also map to the same canonical bucket. For example,
+`holidays` and `vacations` can both map to `holidays_vacations`.
+
+### Why arbitration is needed
+
+Some tasks may carry more than one tag that maps to a time bucket. This happens
+when tags are semantically meaningful in more than one way. For example, a task
+may be related both to university supervision and to an industrial partner.
+
+In those cases, the reporting layer must decide how to allocate time across the
+matching buckets. This decision is called *arbitration*.
+
+Importantly, arbitration is separate from plotting. The plotting code only sees
+final bucket allocations. The logic for resolving ambiguous tag combinations is
+configured under `time_buckets.resolution`.
+
+### Arbitration strategies
+
+Two strategies are supported:
+
+* `priority`
+  * exactly one bucket is selected
+  * the first matching bucket in `priority_order` wins
+
+* `split_weighted`
+  * time is split across all matched buckets
+  * weights come from `weights`
+  * if no weights are given for the matched buckets, each bucket gets weight `1`,
+    which means an equal split
+
+Resolution works like this:
+
+* map raw tags to canonical buckets
+* if zero buckets match, assign all time to `other_bucket`
+* if one bucket matches, assign all time to that bucket
+* if multiple buckets match:
+  * try `rules` from top to bottom
+  * the first matching rule wins
+  * if no rule matches, use the default strategy under
+    `time_buckets.resolution`
+
+### Example rules
+
+Below are two example rules.
+
+The first rule splits time between `alfa_laval` and `msc` with a 3:1 weighted
+split:
+
+```yaml
+time_buckets:
+    resolution:
+    default_strategy: priority
+    priority_order:
+        - alfa_laval
+        - pride
+        - tooling
+        - ml_tooling_tutorial
+        - aim_flix
+        - msc
+        - hh
+        - holidays_vacations
+        - other
+    weights: {}
+    rules:
+        - name: split_alfa_laval_and_msc
+        match_all_tags:
+            - alfa_laval
+            - msc
+        strategy: split_weighted
+        weights:
+            alfa_laval: 3
+            msc: 1
+```
+
+The second rule resolves the same ambiguity by always assigning the time to
+`alfa_laval`:
+
+```yaml
+time_buckets:
+    resolution:
+    rules:
+        - name: prefer_alfa_laval_over_msc
+        match_all_tags:
+            - alfa_laval
+            - msc
+        strategy: priority
+        priority_order:
+            - alfa_laval
+            - msc
+```
+
+In practice, this lets you keep tags semantically honest while still producing a
+clear and configurable reporting view of time allocation.
+
 ## Laundry List
 
 - [ ] plots "by tag" must be only for tags that are exclusive, otherwise it

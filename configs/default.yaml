@@ -24,3 +24,48 @@ reports:
     # If null, timeseries spans the full data range.
     timeseries_last_n_days: null
     timeseries_rolling_days: 7
+
+time_buckets:
+  other_bucket: other
+  bucket_order:
+    - pride
+    - alfa_laval
+    - tooling
+    - ml_tooling_tutorial
+    - aim_flix
+    - msc
+    - hh
+    - holidays_vacations
+    - other
+
+  tag_to_bucket:
+    pride: pride
+    alfa_laval: alfa_laval
+    tooling: tooling
+    ml_tooling_tutorial: ml_tooling_tutorial
+    aim_flix: aim_flix
+    msc: msc
+    hh: hh
+    ite: hh
+    isdd: hh
+    holidays: holidays_vacations
+    vacations: holidays_vacations
+
+  resolution:
+    default_strategy: priority
+    priority_order:
+      - pride
+      - alfa_laval
+      - tooling
+      - ml_tooling_tutorial
+      - aim_flix
+      - msc
+      - hh
+      - holidays_vacations
+      - other
+
+    # Used only for split_weighted. Leaving this empty means equal split.
+    weights: {}
+
+    # First matching rule wins.
+    rules: []
