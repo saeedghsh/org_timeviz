@@ -25,6 +25,10 @@ ensure-env: ## Ensure the conda env exists (create it if missing).
 run: ensure-env ## Run `python -m main` inside the repo conda env.
 	@$(RUN_IN_CONDA_ENV) python -m main
 
+.PHONY: report_time_bucket_violations
+report_time_bucket_violations: ensure-env ## Run `python -m report_time_bucket_violations` inside the repo conda env.
+	@$(RUN_IN_CONDA_ENV) python -m tools.report_time_bucket_violations
+
 ########################################
 ###################### CONDA ENVIRONMENT
 ########################################
