@@ -14,6 +14,13 @@ FIGSIZE: Final[tuple[float, float]] = (20.0, 12.0)
 FIGSIZE_TASK: Final[tuple[float, float]] = (20.0, 12.0)
 OTHERS_LABEL: Final[str] = "(others)"
 
+TIMESERIES_MAIN_COLOR: Final[str] = "tab:blue"
+TIMESERIES_ALL_TIME_COLOR: Final[str] = "orange"
+TIMESERIES_WEEKLY_COLOR: Final[str] = "green"
+TIMESERIES_MONTHLY_COLOR: Final[str] = "red"
+TIMESERIES_WEEKLY_WINDOW_DAYS: Final[int] = 7
+TIMESERIES_MONTHLY_WINDOW_DAYS: Final[int] = 30
+
 
 def _minutes_to_hours(minutes: float) -> float:
     return float(minutes) / 60.0
@@ -84,7 +91,9 @@ def plot_bar_by_task(aggs: Aggregates, out_path: Path, top_k: int) -> None:
 
 
 def plot_timeseries_daily_total(aggs: Aggregates, out_path: Path, rolling_days: int) -> None:
-    """Plot daily total hours, optionally smoothed by a rolling mean."""
+    """Plot daily total hours with all-time, weekly, and monthly averages."""
+    del rolling_days  # Weekly/monthly windows are fixed here by design.
+
     days = sorted(aggs.minutes_by_day.keys())
     fig, ax = plt.subplots(figsize=FIGSIZE)
 
@@ -94,18 +103,45 @@ def plot_timeseries_daily_total(aggs: Aggregates, out_path: Path, rolling_days: 
         return
 
     raw_values = [_minutes_to_hours(aggs.minutes_by_day[day]) for day in days]
-    values = raw_values
-    if rolling_days > 1:
-        values = _rolling_mean(raw_values, window=rolling_days)
+    weekly_values = _rolling_mean(raw_values, window=TIMESERIES_WEEKLY_WINDOW_DAYS)
+    monthly_values = _rolling_mean(raw_values, window=TIMESERIES_MONTHLY_WINDOW_DAYS)
+    all_time_avg = sum(raw_values) / float(len(raw_values))
 
-    ax.plot(days, values)  # type: ignore[arg-type]
+    ax.plot(
+        days,
+        raw_values,
+        color=TIMESERIES_MAIN_COLOR,
+        linestyle="-",
+        label="Daily total",
+    )  # type: ignore[arg-type]
+
+    ax.plot(
+        days,
+        weekly_values,
+        color=TIMESERIES_WEEKLY_COLOR,
+        linestyle="--",
+        label=f"Weekly average ({TIMESERIES_WEEKLY_WINDOW_DAYS}d)",
+    )  # type: ignore[arg-type]
+
+    ax.plot(
+        days,
+        monthly_values,
+        color=TIMESERIES_MONTHLY_COLOR,
+        linestyle="--",
+        label=f"Monthly average ({TIMESERIES_MONTHLY_WINDOW_DAYS}d)",
+    )  # type: ignore[arg-type]
+
+    ax.axhline(
+        all_time_avg,
+        color=TIMESERIES_ALL_TIME_COLOR,
+        linestyle="--",
+        label="All-time average",
+    )
+
     _set_xtick_style(ax, rotation=45)
-
-    avg = sum(raw_values) / float(len(raw_values))
-    ax.axhline(avg, linestyle="--")
-
     ax.set_ylabel("Hours")
     ax.set_title("Daily total hours")
+    ax.legend()
 
     _finalize_figure(fig, out_path)
 
