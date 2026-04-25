@@ -166,7 +166,7 @@ def _figure_size_for_days(day_count: int) -> tuple[float, float]:
 def _task_groups_and_colors(
     slices: list[CalendarSlice],
     top_k: int,
-) -> tuple[list[str], dict[str, object]]:
+) -> tuple[list[str], dict[str, str | tuple[float, float, float, float]]]:
     """Rank tasks by total minutes and assign colors."""
     minutes_by_task: dict[str, int] = defaultdict(int)
     for item in slices:
@@ -180,7 +180,8 @@ def _task_groups_and_colors(
         grouped_names.append(OTHERS_LABEL)
 
     color_map = plt.get_cmap("tab20")
-    color_by_task: dict[str, object] = {}
+    color_by_task: dict[str, str | tuple[float, float, float, float]] = {}
+
     for index, name in enumerate(top_task_names):
         color_by_task[name] = color_map(index % color_map.N)
 
