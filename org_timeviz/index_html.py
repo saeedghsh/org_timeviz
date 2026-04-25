@@ -10,7 +10,7 @@ FRONT_MATTER_PNGS = [
     "time_buckets_monthly.png",
     "calendar_month_last.png",
     "by_task_month_last.png",
-    "by_tags_month_last.png",
+    "by_time_bucket_month_last.png",
 ]
 
 
@@ -21,14 +21,14 @@ class _PlotItem:
 
 
 _BY_TASK_RE = re.compile(r"^by_task_(?P<period>week|month)_(?P<label>.+)\.png$")
-_BY_TAGS_RE = re.compile(r"^by_tags_(?P<period>week|month)_(?P<label>.+)\.png$")
+_BY_TIME_BUCKET_RE = re.compile(r"^by_time_bucket_(?P<period>week|month)_(?P<label>.+)\.png$")
 _CALENDAR_RE = re.compile(r"^calendar_(?P<period>week|month)_(?P<label>.+)\.png$")
 _TIME_BUCKETS_RE = re.compile(r"^time_buckets_(?P<label>.+)\.png$")
 _RANGE_LABEL_RE = re.compile(r"^(?P<start>\d{4}-\d{2}-\d{2})_to_(?P<end>\d{4}-\d{2}-\d{2})$")
 
 
 def _discover_pngs(assets_dir: Path) -> list[str]:
-    return sorted([p.name for p in assets_dir.glob("*.png")])
+    return sorted([path_obj.name for path_obj in assets_dir.glob("*.png")])
 
 
 def _summary_for_png(assets_dir: Path, png_name: str) -> str | None:
@@ -132,8 +132,8 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
     timeseries: list[_PlotItem] = []
     by_task_week: list[tuple[str, _PlotItem]] = []
     by_task_month: list[tuple[str, _PlotItem]] = []
-    by_tags_week: list[tuple[str, _PlotItem]] = []
-    by_tags_month: list[tuple[str, _PlotItem]] = []
+    by_time_bucket_week: list[tuple[str, _PlotItem]] = []
+    by_time_bucket_month: list[tuple[str, _PlotItem]] = []
     calendar_week: list[tuple[str, _PlotItem]] = []
     calendar_month: list[tuple[str, _PlotItem]] = []
     time_buckets: list[_PlotItem] = []
@@ -156,14 +156,14 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
                 by_task_month.append((label, item))
             continue
 
-        match_obj = _BY_TAGS_RE.match(png)
+        match_obj = _BY_TIME_BUCKET_RE.match(png)
         if match_obj:
             period = match_obj.group("period")
             label = match_obj.group("label")
             if period == "week":
-                by_tags_week.append((label, item))
+                by_time_bucket_week.append((label, item))
             else:
-                by_tags_month.append((label, item))
+                by_time_bucket_month.append((label, item))
             continue
 
         match_obj = _CALENDAR_RE.match(png)
@@ -185,8 +185,8 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
 
     by_task_week.sort(key=lambda item: _label_sort_key(item[0]))
     by_task_month.sort(key=lambda item: _label_sort_key(item[0]))
-    by_tags_week.sort(key=lambda item: _label_sort_key(item[0]))
-    by_tags_month.sort(key=lambda item: _label_sort_key(item[0]))
+    by_time_bucket_week.sort(key=lambda item: _label_sort_key(item[0]))
+    by_time_bucket_month.sort(key=lambda item: _label_sort_key(item[0]))
     calendar_week.sort(key=lambda item: _label_sort_key(item[0]))
     calendar_month.sort(key=lambda item: _label_sort_key(item[0]))
 
@@ -234,8 +234,16 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
         _section("timeseries", timeseries, asset_prefix),
         _section("by_task / week", [item for _, item in by_task_week], asset_prefix)
         + _section("by_task / month", [item for _, item in by_task_month], asset_prefix),
-        _section("by_tags / week", [item for _, item in by_tags_week], asset_prefix)
-        + _section("by_tags / month", [item for _, item in by_tags_month], asset_prefix),
+        _section(
+            "by_time_bucket / week",
+            [item for _, item in by_time_bucket_week],
+            asset_prefix,
+        )
+        + _section(
+            "by_time_bucket / month",
+            [item for _, item in by_time_bucket_month],
+            asset_prefix,
+        ),
         _section("calendar / week", [item for _, item in calendar_week], asset_prefix)
         + _section("calendar / month", [item for _, item in calendar_month], asset_prefix),
         _section("time buckets", time_buckets, asset_prefix),
