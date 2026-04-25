@@ -16,6 +16,7 @@ from .time_windows import month_start, next_month_start
 
 FIGSIZE: Final[tuple[float, float]] = (22.0, 10.0)
 COMBINED_HOLIDAY_BUCKET: Final[str] = "holidays_vacations"
+COMBINED_HH_BUCKET: Final[str] = "hh"
 OTHER_BUCKET: Final[str] = "other"
 BUCKET_ORDER: Final[tuple[str, ...]] = (
     "pride",
@@ -23,17 +24,24 @@ BUCKET_ORDER: Final[tuple[str, ...]] = (
     "tooling",
     "ml_tooling_tutorial",
     "aim_flix",
+    "msc",
+    "hh",
+    "ite",
+    "isdd",
     COMBINED_HOLIDAY_BUCKET,
     OTHER_BUCKET,
 )
 CANONICAL_BUCKET_BY_TAG: Final[dict[str, str]] = {
     "pride": "pride",
     "alfa_laval": "alfa_laval",
-    "tooling": "tooling",
-    "ml_tooling_tutorial": "ml_tooling_tutorial",
     "aim_flix": "aim_flix",
+    "ml_tooling_tutorial": "ml_tooling_tutorial",
+    "tooling": "tooling",
     "holidays": COMBINED_HOLIDAY_BUCKET,
     "vacations": COMBINED_HOLIDAY_BUCKET,
+    "hh": COMBINED_HH_BUCKET,
+    "ite": COMBINED_HH_BUCKET,
+    "isdd": COMBINED_HH_BUCKET,
 }
 
 
