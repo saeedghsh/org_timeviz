@@ -11,70 +11,54 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
+from .config import TimeBucketsConfig
 from .filters import ClippedRecord
+from .time_bucket_resolver import resolve_time_bucket_allocations
 from .time_windows import month_start, next_month_start
 
 FIGSIZE: Final[tuple[float, float]] = (22.0, 10.0)
-COMBINED_HOLIDAY_BUCKET: Final[str] = "holidays_vacations"
-COMBINED_HH_BUCKET: Final[str] = "hh"
-OTHER_BUCKET: Final[str] = "other"
-BUCKET_ORDER: Final[tuple[str, ...]] = (
-    "pride",
-    "alfa_laval",
-    "tooling",
-    "ml_tooling_tutorial",
-    "aim_flix",
-    "msc",
-    "hh",
-    "ite",
-    "isdd",
-    COMBINED_HOLIDAY_BUCKET,
-    OTHER_BUCKET,
-)
-CANONICAL_BUCKET_BY_TAG: Final[dict[str, str]] = {
-    "pride": "pride",
-    "alfa_laval": "alfa_laval",
-    "aim_flix": "aim_flix",
-    "ml_tooling_tutorial": "ml_tooling_tutorial",
-    "tooling": "tooling",
-    "holidays": COMBINED_HOLIDAY_BUCKET,
-    "vacations": COMBINED_HOLIDAY_BUCKET,
-    "hh": COMBINED_HH_BUCKET,
-    "ite": COMBINED_HH_BUCKET,
-    "isdd": COMBINED_HH_BUCKET,
-}
 
 
 @dataclass(frozen=True)
 class MonthlyTimeBuckets:
     """Hold monthly totals and bucket breakdowns."""
 
+    bucket_order: list[str]
     months: list[date]
-    minutes_total_by_month: dict[date, int]
-    minutes_by_bucket: dict[str, dict[date, int]]
+    minutes_total_by_month: dict[date, float]
+    minutes_by_bucket: dict[str, dict[date, float]]
 
 
-def compute_monthly_time_buckets(records: Iterable[ClippedRecord]) -> MonthlyTimeBuckets:
+def compute_monthly_time_buckets(
+    records: Iterable[ClippedRecord],
+    cfg: TimeBucketsConfig,
+) -> MonthlyTimeBuckets:
     """Aggregate clipped records by calendar month and time-bucket."""
-    minutes_total_by_month: dict[date, int] = defaultdict(int)
-    raw_minutes_by_bucket: dict[str, dict[date, int]] = {
-        bucket: defaultdict(int) for bucket in BUCKET_ORDER
+    minutes_total_by_month: dict[date, float] = defaultdict(float)
+    raw_minutes_by_bucket: dict[str, dict[date, float]] = {
+        bucket_name: defaultdict(float) for bucket_name in cfg.bucket_order
     }
 
     for record in records:
-        bucket = _bucket_for_tags(record.record.tags)
+        allocations = resolve_time_bucket_allocations(record.record.tags, cfg)
+
         for month_key, minutes in _split_record_across_months(record):
-            minutes_total_by_month[month_key] += minutes
-            raw_minutes_by_bucket[bucket][month_key] += minutes
+            minutes_total_by_month[month_key] += float(minutes)
+
+            for bucket_name, fraction in allocations.items():
+                raw_minutes_by_bucket[bucket_name][month_key] += float(minutes) * fraction
 
     months = sorted(minutes_total_by_month.keys())
-    minutes_by_bucket: dict[str, dict[date, int]] = {}
-    for bucket in BUCKET_ORDER:
-        minutes_by_bucket[bucket] = {
-            month_key: raw_minutes_by_bucket[bucket].get(month_key, 0) for month_key in months
+    minutes_by_bucket: dict[str, dict[date, float]] = {}
+
+    for bucket_name in cfg.bucket_order:
+        minutes_by_bucket[bucket_name] = {
+            month_key: raw_minutes_by_bucket[bucket_name].get(month_key, 0.0)
+            for month_key in months
         }
 
     return MonthlyTimeBuckets(
+        bucket_order=list(cfg.bucket_order),
         months=months,
         minutes_total_by_month=dict(minutes_total_by_month),
         minutes_by_bucket=minutes_by_bucket,
@@ -94,21 +78,21 @@ def plot_monthly_time_buckets(report: MonthlyTimeBuckets, out_path: Path) -> Non
         _finalize_figure(fig, out_path)
         return
 
-    for bucket in BUCKET_ORDER:
+    for bucket_name in report.bucket_order:
         pct_values = [
             _percentage(
-                report.minutes_by_bucket[bucket][month_key],
+                report.minutes_by_bucket[bucket_name][month_key],
                 report.minutes_total_by_month[month_key],
             )
             for month_key in report.months
         ]
         abs_values = [
-            _minutes_to_hours(report.minutes_by_bucket[bucket][month_key])
+            _minutes_to_hours(report.minutes_by_bucket[bucket_name][month_key])
             for month_key in report.months
         ]
 
-        ax_pct.plot(report.months, pct_values, marker="o", label=bucket)  # type: ignore[arg-type]
-        ax_abs.plot(report.months, abs_values, marker="o", label=bucket)  # type: ignore[arg-type]
+        ax_pct.plot(report.months, pct_values, marker="o", label=bucket_name)  # type: ignore[arg-type]
+        ax_abs.plot(report.months, abs_values, marker="o", label=bucket_name)  # type: ignore[arg-type]
 
     ax_pct.set_title("Monthly time-bucket share of total time")
     ax_pct.set_ylabel("Percent")
@@ -129,56 +113,38 @@ def plot_monthly_time_buckets(report: MonthlyTimeBuckets, out_path: Path) -> Non
     _finalize_figure(fig, out_path, tight_layout_rect=(0.0, 0.0, 0.82, 1.0))
 
 
-def write_monthly_time_buckets_summary_json(report: MonthlyTimeBuckets, out_path: Path) -> None:
+def write_monthly_time_buckets_summary_json(
+    report: MonthlyTimeBuckets,
+    out_path: Path,
+) -> None:
     """Write a JSON summary for the monthly time-bucket report."""
-    months = [month_key.isoformat() for month_key in report.months]
-
     payload = {
-        "months": months,
+        "months": [month_key.isoformat() for month_key in report.months],
         "hours_total_by_month": {
             month_key.isoformat(): _minutes_to_hours(report.minutes_total_by_month[month_key])
             for month_key in report.months
         },
         "hours_by_bucket": {
-            bucket: {
+            bucket_name: {
                 month_key.isoformat(): _minutes_to_hours(
-                    report.minutes_by_bucket[bucket][month_key]
+                    report.minutes_by_bucket[bucket_name][month_key]
                 )
                 for month_key in report.months
             }
-            for bucket in BUCKET_ORDER
+            for bucket_name in report.bucket_order
         },
         "percent_by_bucket": {
-            bucket: {
+            bucket_name: {
                 month_key.isoformat(): _percentage(
-                    report.minutes_by_bucket[bucket][month_key],
+                    report.minutes_by_bucket[bucket_name][month_key],
                     report.minutes_total_by_month[month_key],
                 )
                 for month_key in report.months
             }
-            for bucket in BUCKET_ORDER
+            for bucket_name in report.bucket_order
         },
     }
     out_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-
-
-def _bucket_for_tags(tags: tuple[str, ...]) -> str:
-    """Map task tags to one canonical time-bucket."""
-    matched_buckets = {
-        CANONICAL_BUCKET_BY_TAG[tag] for tag in tags if tag in CANONICAL_BUCKET_BY_TAG
-    }
-    if not matched_buckets:
-        return OTHER_BUCKET
-    if len(matched_buckets) == 1:
-        return next(iter(matched_buckets))
-
-    # TODO: raise again after fixed multiple tags per tasks issue
-    # this will not allow more than one time-bucket over one task
-    # raise ValueError(
-    #     "Expected at most one time-bucket tag per task, but found: "
-    #     + ", ".join(sorted(matched_buckets))
-    # )
-    return next(iter(matched_buckets))
 
 
 def _split_record_across_months(record: ClippedRecord) -> list[tuple[date, int]]:
@@ -200,14 +166,14 @@ def _split_record_across_months(record: ClippedRecord) -> list[tuple[date, int]]
     return out
 
 
-def _minutes_to_hours(minutes: int) -> float:
+def _minutes_to_hours(minutes: float) -> float:
     """Convert minutes to hours."""
-    return minutes / 60.0
+    return float(minutes) / 60.0
 
 
-def _percentage(part: int, whole: int) -> float:
+def _percentage(part: float, whole: float) -> float:
     """Convert a part/whole pair to percentage."""
-    if whole <= 0:
+    if whole <= 0.0:
         return 0.0
     return 100.0 * float(part) / float(whole)
 

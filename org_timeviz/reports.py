@@ -184,10 +184,12 @@ def _write_timeseries_report(
     write_summary_json(aggs, assets_root / f"{stem}__summary.json")
 
 
-def _write_time_buckets_report(filtered_records: list[ClippedRecord], assets_root: Path) -> None:
+def _write_time_buckets_report(
+    filtered_records: list[ClippedRecord], assets_root: Path, cfg: AppConfig
+) -> None:
     """Write the monthly time-bucket plot and its summary."""
     stem = "time_buckets_monthly"
-    report = compute_monthly_time_buckets(filtered_records)
+    report = compute_monthly_time_buckets(filtered_records, cfg.time_buckets)
     plot_monthly_time_buckets(report, assets_root / f"{stem}.png")
     write_monthly_time_buckets_summary_json(report, assets_root / f"{stem}__summary.json")
 
@@ -283,7 +285,7 @@ def generate_all_reports(cfg: AppConfig) -> None:
         end=at_midnight(max_dt) + timedelta(days=1),
     )
     all_time_records = _build_filtered_records(cfg, records, all_time_window)
-    _write_time_buckets_report(all_time_records, assets_root)
+    _write_time_buckets_report(all_time_records, assets_root, cfg)
 
     _LOG.info("Wrote report artifacts to %s", assets_root)
 
