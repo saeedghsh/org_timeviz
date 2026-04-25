@@ -47,15 +47,18 @@ Artifacts are written under `outputs/assets/`, and `outputs/index.html` links to
 them. Each plot also has a matching JSON summary next to it.
 
 * "Last" windows:
-  * `by_task_week_last.png` and `by_task_week_last__summary.json` (last 7 days)
-  * `by_task_month_last.png` and `by_task_month_last__summary.json` (last 30
-    days)
-  * `by_time_bucket_week_last.png` and
-    `by_time_bucket_week_last__summary.json`
-  * `by_time_bucket_month_last.png` and
-    `by_time_bucket_month_last__summary.json`
-  * `calendar_week_last.png` and `calendar_week_last__summary.json`
-  * `calendar_month_last.png` and `calendar_month_last__summary.json`
+  * `by_task_week_last_YYYY-MM-DD_to_YYYY-MM-DD.png` and
+    `by_task_week_last_YYYY-MM-DD_to_YYYY-MM-DD__summary.json`
+  * `by_task_month_last_YYYY-MM-DD_to_YYYY-MM-DD.png` and
+    `by_task_month_last_YYYY-MM-DD_to_YYYY-MM-DD__summary.json`
+  * `by_time_bucket_week_last_YYYY-MM-DD_to_YYYY-MM-DD.png` and
+    `by_time_bucket_week_last_YYYY-MM-DD_to_YYYY-MM-DD__summary.json`
+  * `by_time_bucket_month_last_YYYY-MM-DD_to_YYYY-MM-DD.png` and
+    `by_time_bucket_month_last_YYYY-MM-DD_to_YYYY-MM-DD__summary.json`
+  * `calendar_week_last_YYYY-MM-DD_to_YYYY-MM-DD.png` and
+    `calendar_week_last_YYYY-MM-DD_to_YYYY-MM-DD__summary.json`
+  * `calendar_month_last_YYYY-MM-DD_to_YYYY-MM-DD.png` and
+    `calendar_month_last_YYYY-MM-DD_to_YYYY-MM-DD__summary.json`
 
 * Full-range windows (one per period):
   * `by_task_week_YYYY-MM-DD_to_YYYY-MM-DD.png`
@@ -188,8 +191,6 @@ clear and configurable reporting view of time allocation.
 
 ## Laundry List
 
-- [ ] sort under each heading by "last", "most_recent", "most_recent - 1", ...
-  Right now it is "last", "first_ever", "first_ever + 1", ...
 - [ ] the timeseries is nice, but maybe a representation that also show
       tasks/tags which have been the focus in each period.
 

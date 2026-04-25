@@ -6,11 +6,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-FRONT_MATTER_PNGS = [
+FRONT_MATTER_SELECTORS = [
     "time_buckets_monthly.png",
-    "calendar_month_last.png",
-    "by_task_month_last.png",
-    "by_time_bucket_month_last.png",
+    "calendar_month_last_",
+    "by_task_month_last_",
+    "by_time_bucket_month_last_",
 ]
 
 
@@ -24,7 +24,9 @@ _BY_TASK_RE = re.compile(r"^by_task_(?P<period>week|month)_(?P<label>.+)\.png$")
 _BY_TIME_BUCKET_RE = re.compile(r"^by_time_bucket_(?P<period>week|month)_(?P<label>.+)\.png$")
 _CALENDAR_RE = re.compile(r"^calendar_(?P<period>week|month)_(?P<label>.+)\.png$")
 _TIME_BUCKETS_RE = re.compile(r"^time_buckets_(?P<label>.+)\.png$")
-_RANGE_LABEL_RE = re.compile(r"^(?P<start>\d{4}-\d{2}-\d{2})_to_(?P<end>\d{4}-\d{2}-\d{2})$")
+_RANGE_LABEL_RE = re.compile(
+    r"^(?:(?P<kind>last)_)?(?P<start>\d{4}-\d{2}-\d{2})_to_(?P<end>\d{4}-\d{2}-\d{2})$"
+)
 
 
 def _discover_pngs(assets_dir: Path) -> list[str]:
@@ -37,6 +39,22 @@ def _summary_for_png(assets_dir: Path, png_name: str) -> str | None:
     return candidate.name if candidate.exists() else None
 
 
+def _resolve_front_matter_items(
+    items_by_png: dict[str, _PlotItem],
+) -> list[_PlotItem]:
+    """Resolve featured items from exact names or filename prefixes."""
+    selected: list[_PlotItem] = []
+    for selector in FRONT_MATTER_SELECTORS:
+        if selector.endswith(".png"):
+            if selector in items_by_png:
+                selected.append(items_by_png[selector])
+            continue
+        matches = sorted(png_name for png_name in items_by_png if png_name.startswith(selector))
+        if matches:
+            selected.append(items_by_png[matches[-1]])
+    return selected
+
+
 def _label_sort_key(label: str) -> tuple[int, int | str]:
     if label == "last":
         return (0, 0)
@@ -46,8 +64,9 @@ def _label_sort_key(label: str) -> tuple[int, int | str]:
         start_date = match_obj.group("start")
         year_str, month_str, day_str = start_date.split("-")
         ordinal = int(year_str) * 10000 + int(month_str) * 100 + int(day_str)
+        if match_obj.group("kind") == "last":
+            return (0, -ordinal)
         return (1, -ordinal)
-
     return (2, label)
 
 
@@ -130,9 +149,7 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
         for png_name in pngs
     }
 
-    featured_items = [
-        items_by_png[png_name] for png_name in FRONT_MATTER_PNGS if png_name in items_by_png
-    ]
+    featured_items = _resolve_front_matter_items(items_by_png)
 
     timeseries: list[_PlotItem] = []
     by_task_week: list[tuple[str, _PlotItem]] = []

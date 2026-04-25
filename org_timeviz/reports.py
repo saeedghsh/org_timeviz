@@ -38,6 +38,11 @@ _LOG = logging.getLogger(__name__)
 ASSETS_DIR_NAME = "assets"
 
 
+def _latest_label(window: TimeWindow) -> str:
+    """Build a stable label for the latest rolling window."""
+    return f"last_{label_range(window)}"
+
+
 @dataclass(frozen=True)
 class _OrgInputs:
     org_files: list[Path]
@@ -230,9 +235,9 @@ def generate_all_reports(cfg: AppConfig) -> None:
     top_k_tasks = cfg.reports.plots.top_k_tasks
     top_k_time_buckets = cfg.reports.plots.top_k_tags
 
-    for period, label, window in (
-        ("week", "last", window_last_n_days(now, 7)),
-        ("month", "last", window_last_n_days(now, 30)),
+    for period, window in (
+        ("week", window_last_n_days(now, 7)),
+        ("month", window_last_n_days(now, 30)),
     ):
         filtered_records = _build_filtered_records(cfg, records, window)
         aggs = _build_aggs_from_filtered(cfg, filtered_records)
@@ -241,7 +246,7 @@ def generate_all_reports(cfg: AppConfig) -> None:
             aggs,
             assets_root,
             period=period,
-            label=label,
+            label=_latest_label(window),
             top_k_tasks=top_k_tasks,
             top_k_time_buckets=top_k_time_buckets,
         )
