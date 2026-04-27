@@ -7,9 +7,10 @@ from pathlib import Path
 from typing import Iterable
 
 FRONT_MATTER_SELECTORS = [
-    "timeseries__time_bucket__month__all_time.png",
-    "calendar_view__task__month__",
+    "calendar_view__time_bucket__month__",
     "histogram__time_bucket__month__",
+    "timeseries__time_bucket__month__all_time.png",
+    "timeseries__daily_working_hours__day__all_time.png",
 ]
 
 _RANGE_LABEL_RE = re.compile(
