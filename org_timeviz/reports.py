@@ -14,12 +14,7 @@ from .emacs_batch import parse_org_clock_records_emacs
 from .filters import ClippedRecord, apply_filters, clip_to_window
 from .index_html import write_index_html
 from .models import ClockRecord
-from .plots import (
-    plot_bar_by_task,
-    plot_bar_by_time_bucket,
-    plot_timeseries_daily_total,
-    write_summary_json,
-)
+from .plots import plot_bar_by_time_bucket, plot_timeseries_daily_total, write_summary_json
 from .time_buckets import (
     compute_monthly_time_buckets,
     plot_monthly_time_buckets,
@@ -112,12 +107,6 @@ def _build_aggs_from_filtered(cfg: AppConfig, records: list[ClippedRecord]) -> A
     return compute_aggregates(records, cfg.time_buckets)
 
 
-def _write_task_report(aggs: Aggregates, assets_root: Path, stem: str, top_k: int) -> None:
-    """Write the task bar plot and its summary."""
-    plot_bar_by_task(aggs, assets_root / f"{stem}.png", top_k=top_k)
-    write_summary_json(aggs, assets_root / f"{stem}__summary.json")
-
-
 def _write_time_bucket_report(
     aggs: Aggregates,
     assets_root: Path,
@@ -160,13 +149,7 @@ def _write_window_reports(
     top_k_tasks: int,
     top_k_time_buckets: int,
 ) -> None:
-    """Write task, time-bucket, and calendar reports for one window."""
-    _write_task_report(
-        aggs,
-        assets_root,
-        f"by_task_{period}_{label}",
-        top_k=top_k_tasks,
-    )
+    """Write time-bucket and calendar reports for one window."""
     _write_time_bucket_report(
         aggs,
         assets_root,

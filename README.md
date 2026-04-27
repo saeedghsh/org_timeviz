@@ -27,7 +27,7 @@ not list report names.
 * `reports.filters`: include/exclude tags and task regex filters applied to all
   reports
 * `reports.plots`:
-  * `top_k_tasks`: top-K tasks plus one extra "(others)" bin
+  * `top_k_tasks`: top-K tasks used by the calendar view legend
   * `top_k_tags`: top-K time buckets plus one extra "(others)" bin
   * `timeseries_last_n_days`: if null, use all time; otherwise last N days
   * `timeseries_rolling_days`: rolling mean window for the timeseries
@@ -47,10 +47,6 @@ Artifacts are written under `outputs/assets/`, and `outputs/index.html` links to
 them. Each plot also has a matching JSON summary next to it.
 
 * "Last" windows:
-  * `by_task_week_last_YYYY-MM-DD_to_YYYY-MM-DD.png` and
-    `by_task_week_last_YYYY-MM-DD_to_YYYY-MM-DD__summary.json`
-  * `by_task_month_last_YYYY-MM-DD_to_YYYY-MM-DD.png` and
-    `by_task_month_last_YYYY-MM-DD_to_YYYY-MM-DD__summary.json`
   * `by_time_bucket_week_last_YYYY-MM-DD_to_YYYY-MM-DD.png` and
     `by_time_bucket_week_last_YYYY-MM-DD_to_YYYY-MM-DD__summary.json`
   * `by_time_bucket_month_last_YYYY-MM-DD_to_YYYY-MM-DD.png` and
@@ -61,8 +57,6 @@ them. Each plot also has a matching JSON summary next to it.
     `calendar_month_last_YYYY-MM-DD_to_YYYY-MM-DD__summary.json`
 
 * Full-range windows (one per period):
-  * `by_task_week_YYYY-MM-DD_to_YYYY-MM-DD.png`
-  * `by_task_month_YYYY-MM-DD_to_YYYY-MM-DD.png`
   * `by_time_bucket_week_YYYY-MM-DD_to_YYYY-MM-DD.png`
   * `by_time_bucket_month_YYYY-MM-DD_to_YYYY-MM-DD.png`
   * `calendar_week_YYYY-MM-DD_to_YYYY-MM-DD.png`

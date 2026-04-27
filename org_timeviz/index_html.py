@@ -9,7 +9,6 @@ from typing import Iterable
 FRONT_MATTER_SELECTORS = [
     "time_buckets_monthly.png",
     "calendar_month_last_",
-    "by_task_month_last_",
     "by_time_bucket_month_last_",
 ]
 
@@ -20,7 +19,6 @@ class _PlotItem:
     summary_name: str | None
 
 
-_BY_TASK_RE = re.compile(r"^by_task_(?P<period>week|month)_(?P<label>.+)\.png$")
 _BY_TIME_BUCKET_RE = re.compile(r"^by_time_bucket_(?P<period>week|month)_(?P<label>.+)\.png$")
 _CALENDAR_RE = re.compile(r"^calendar_(?P<period>week|month)_(?P<label>.+)\.png$")
 _TIME_BUCKETS_RE = re.compile(r"^time_buckets_(?P<label>.+)\.png$")
@@ -152,8 +150,6 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
     featured_items = _resolve_front_matter_items(items_by_png)
 
     timeseries: list[_PlotItem] = []
-    by_task_week: list[tuple[str, _PlotItem]] = []
-    by_task_month: list[tuple[str, _PlotItem]] = []
     by_time_bucket_week: list[tuple[str, _PlotItem]] = []
     by_time_bucket_month: list[tuple[str, _PlotItem]] = []
     calendar_week: list[tuple[str, _PlotItem]] = []
@@ -166,16 +162,6 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
 
         if png.startswith("timeseries_"):
             timeseries.append(item)
-            continue
-
-        match_obj = _BY_TASK_RE.match(png)
-        if match_obj:
-            period = match_obj.group("period")
-            label = match_obj.group("label")
-            if period == "week":
-                by_task_week.append((label, item))
-            else:
-                by_task_month.append((label, item))
             continue
 
         match_obj = _BY_TIME_BUCKET_RE.match(png)
@@ -205,8 +191,6 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
 
         other.append(item)
 
-    by_task_week.sort(key=lambda item: _label_sort_key(item[0]))
-    by_task_month.sort(key=lambda item: _label_sort_key(item[0]))
     by_time_bucket_week.sort(key=lambda item: _label_sort_key(item[0]))
     by_time_bucket_month.sort(key=lambda item: _label_sort_key(item[0]))
     calendar_week.sort(key=lambda item: _label_sort_key(item[0]))
@@ -247,15 +231,11 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
   %s
 
   %s
-
-  %s
 </body>
 </html>
 """ % (
         _front_matter_section(featured_items, asset_prefix),
         _section("timeseries", timeseries, asset_prefix),
-        _section("by_task / week", [item for _, item in by_task_week], asset_prefix)
-        + _section("by_task / month", [item for _, item in by_task_month], asset_prefix),
         _section(
             "by_time_bucket / week",
             [item for _, item in by_time_bucket_week],
