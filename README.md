@@ -71,6 +71,16 @@ them. Each plot also has a matching JSON summary next to it.
 * Time series:
   * `timeseries_daily_total.png` and
     `timeseries_daily_total__summary.json`
+  * the main line shows actual daily hours for days with logged time
+  * the dashed average lines show:
+    * all-time average per workday across the plotted range
+    * trailing weekly average per workday (7 calendar days)
+    * trailing monthly average per workday (30 calendar days)
+  * weekend and other zero-hour days are included in the averaging windows
+    where relevant, but the main daily line is drawn only for days with logged
+    time
+  * weekend hours are included in the numerator of weekly/monthly/all-time
+    averages, but weekends are not counted in the denominator
 
 * Monthly time-bucket trend report:
   * `time_buckets_monthly.png` and `time_buckets_monthly__summary.json`

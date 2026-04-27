@@ -1,6 +1,7 @@
 """Generate plot and summary artifacts from aggregated time totals."""
 
 import json
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Final
 
@@ -55,6 +56,42 @@ def _set_xtick_style(ax: Axes, rotation: float) -> None:
         label.set_horizontalalignment("right")
 
 
+def _full_day_range(start_day: date, end_day: date) -> list[date]:
+    """Return all calendar days in the inclusive range."""
+    return [start_day + timedelta(days=offset) for offset in range((end_day - start_day).days + 1)]
+
+
+def _is_workday(day: date) -> bool:
+    """Return whether a date is a weekday."""
+    return day.weekday() < 5
+
+
+def _workday_average(values: list[float], days: list[date]) -> float:
+    """Compute average per workday for one aligned day/value sequence."""
+    workday_count = sum(1 for day in days if _is_workday(day))
+    if workday_count <= 0:
+        return 0.0
+    return sum(values) / float(workday_count)
+
+
+def _rolling_workday_average(
+    values: list[float],
+    days: list[date],
+    window_days: int,
+) -> list[float]:
+    """Compute trailing workday-normalized averages over calendar windows."""
+    if window_days <= 1:
+        return values
+
+    out: list[float] = []
+    for index in range(len(values)):
+        lo = max(0, index - window_days + 1)
+        chunk_values = values[lo : index + 1]
+        chunk_days = days[lo : index + 1]
+        out.append(_workday_average(chunk_values, chunk_days))
+    return out
+
+
 def plot_bar_by_time_bucket(aggs: Aggregates, out_path: Path, top_k: int) -> None:
     """Plot a bar chart of total hours per time bucket."""
     pairs = _top_k_with_others(aggs.minutes_by_time_bucket, top_k)
@@ -91,70 +128,72 @@ def plot_bar_by_task(aggs: Aggregates, out_path: Path, top_k: int) -> None:
 
 
 def plot_timeseries_daily_total(aggs: Aggregates, out_path: Path, rolling_days: int) -> None:
-    """Plot daily total hours with all-time, weekly, and monthly averages."""
-    del rolling_days  # Weekly/monthly windows are fixed here by design.
+    """Plot daily total hours with workday-normalized averages."""
+    del rolling_days
 
-    days = sorted(aggs.minutes_by_day.keys())
+    logged_days = sorted(aggs.minutes_by_day.keys())
     fig, ax = plt.subplots(figsize=FIGSIZE)
 
-    if not days:
+    if not logged_days:
         ax.set_title("Daily total hours")
         _finalize_figure(fig, out_path)
         return
 
-    raw_values = [_minutes_to_hours(aggs.minutes_by_day[day]) for day in days]
-    weekly_values = _rolling_mean(raw_values, window=TIMESERIES_WEEKLY_WINDOW_DAYS)
-    monthly_values = _rolling_mean(raw_values, window=TIMESERIES_MONTHLY_WINDOW_DAYS)
-    all_time_avg = sum(raw_values) / float(len(raw_values))
+    full_days = _full_day_range(logged_days[0], logged_days[-1])
+
+    daily_values = [_minutes_to_hours(float(aggs.minutes_by_day[day])) for day in logged_days]
+    full_values = [_minutes_to_hours(float(aggs.minutes_by_day.get(day, 0))) for day in full_days]
+
+    weekly_values = _rolling_workday_average(
+        full_values,
+        full_days,
+        window_days=TIMESERIES_WEEKLY_WINDOW_DAYS,
+    )
+    monthly_values = _rolling_workday_average(
+        full_values,
+        full_days,
+        window_days=TIMESERIES_MONTHLY_WINDOW_DAYS,
+    )
+    all_time_avg = _workday_average(full_values, full_days)
 
     ax.plot(
-        days,
-        raw_values,
+        logged_days,
+        daily_values,
         color=TIMESERIES_MAIN_COLOR,
         linestyle="-",
         label="Daily total",
     )  # type: ignore[arg-type]
 
     ax.plot(
-        days,
+        full_days,
         weekly_values,
         color=TIMESERIES_WEEKLY_COLOR,
         linestyle="--",
-        label=f"Weekly average ({TIMESERIES_WEEKLY_WINDOW_DAYS}d)",
+        label=f"Weekly avg / workday ({TIMESERIES_WEEKLY_WINDOW_DAYS}d)",
     )  # type: ignore[arg-type]
 
     ax.plot(
-        days,
+        full_days,
         monthly_values,
         color=TIMESERIES_MONTHLY_COLOR,
         linestyle="--",
-        label=f"Monthly average ({TIMESERIES_MONTHLY_WINDOW_DAYS}d)",
+        label=f"Monthly avg / workday ({TIMESERIES_MONTHLY_WINDOW_DAYS}d)",
     )  # type: ignore[arg-type]
 
     ax.axhline(
         all_time_avg,
         color=TIMESERIES_ALL_TIME_COLOR,
         linestyle="--",
-        label="All-time average",
+        label="All-time avg / workday",
     )
 
     _set_xtick_style(ax, rotation=45)
+
     ax.set_ylabel("Hours")
     ax.set_title("Daily total hours")
     ax.legend()
 
     _finalize_figure(fig, out_path)
-
-
-def _rolling_mean(values: list[float], window: int) -> list[float]:
-    if window <= 1:
-        return values
-    out: list[float] = []
-    for index in range(len(values)):
-        lo = max(0, index - window + 1)
-        chunk = values[lo : index + 1]
-        out.append(sum(chunk) / float(len(chunk)))
-    return out
 
 
 def write_summary_json(aggs: Aggregates, out_path: Path) -> None:
