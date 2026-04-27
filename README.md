@@ -46,35 +46,39 @@ like TODO/IN-PROGRESS/BLOCKED/etc.
 Artifacts are written under `outputs/assets/`, and `outputs/index.html` links to
 them. Each plot also has a matching JSON summary next to it.
 
-* "Last" windows:
-  * `by_time_bucket_week_last_YYYY-MM-DD_to_YYYY-MM-DD.png` and
-    `by_time_bucket_week_last_YYYY-MM-DD_to_YYYY-MM-DD__summary.json`
-  * `by_time_bucket_month_last_YYYY-MM-DD_to_YYYY-MM-DD.png` and
-    `by_time_bucket_month_last_YYYY-MM-DD_to_YYYY-MM-DD__summary.json`
-  * `calendar_month_last_YYYY-MM-DD_to_YYYY-MM-DD.png` and
-    `calendar_month_last_YYYY-MM-DD_to_YYYY-MM-DD__summary.json`
+Naming follows this pattern:
 
-* Full-range windows (one per period):
-  * `by_time_bucket_week_YYYY-MM-DD_to_YYYY-MM-DD.png`
-  * `by_time_bucket_month_YYYY-MM-DD_to_YYYY-MM-DD.png`
-  * `calendar_month_YYYY-MM-DD_to_YYYY-MM-DD.png`
+* `<visualization>__<content>__<period>__<range>`
+* for the latest rolling windows, the suffix becomes
+  `<visualization>__<content>__<period>__<range>__latest`
+
+Examples:
+* `histogram__time_bucket__month__YYYY-MM-DD_to_YYYY-MM-DD.png`
+* `histogram__time_bucket__month__YYYY-MM-DD_to_YYYY-MM-DD__latest.png`
+* `calendar_view__task__month__YYYY-MM-DD_to_YYYY-MM-DD.png`
+* `timeseries__daily_working_hours__day__all_time.png`
+* `timeseries__time_bucket__month__all_time.png`
+
+Generated artifacts currently include:
+
+* Latest rolling windows:
+  * `histogram__time_bucket__week__YYYY-MM-DD_to_YYYY-MM-DD__latest.png`
+    and matching summary JSON
+  * `histogram__time_bucket__month__YYYY-MM-DD_to_YYYY-MM-DD__latest.png`
+    and matching summary JSON
+  * `calendar_view__task__month__YYYY-MM-DD_to_YYYY-MM-DD__latest.png`
+    and matching summary JSON
+
+* Full-range windows:
+  * `histogram__time_bucket__week__YYYY-MM-DD_to_YYYY-MM-DD.png`
+  * `histogram__time_bucket__month__YYYY-MM-DD_to_YYYY-MM-DD.png`
+  * `calendar_view__task__month__YYYY-MM-DD_to_YYYY-MM-DD.png`
 
 * Time series:
-  * `timeseries_daily_total.png` and
-    `timeseries_daily_total__summary.json`
-  * the main line shows actual daily hours for days with logged time
-  * the dashed average lines show:
-    * all-time average per workday across the plotted range
-    * trailing weekly average per workday (7 calendar days)
-    * trailing monthly average per workday (30 calendar days)
-  * weekend and other zero-hour days are included in the averaging windows
-    where relevant, but the main daily line is drawn only for days with logged
-    time
-  * weekend hours are included in the numerator of weekly/monthly/all-time
-    averages, but weekends are not counted in the denominator
-
-* Monthly time-bucket trend report:
-  * `time_buckets_monthly.png` and `time_buckets_monthly__summary.json`
+  * `timeseries__daily_working_hours__day__all_time.png` or, when configured
+    for a trailing window,
+    `timeseries__daily_working_hours__day__YYYY-MM-DD_to_YYYY-MM-DD__latest.png`
+  * `timeseries__time_bucket__month__all_time.png`
 
 ## Time buckets from tags
 

@@ -7,10 +7,32 @@ from pathlib import Path
 from typing import Iterable
 
 FRONT_MATTER_SELECTORS = [
-    "time_buckets_monthly.png",
-    "calendar_month_last_",
-    "by_time_bucket_month_last_",
+    "timeseries__time_bucket__month__all_time.png",
+    "calendar_view__task__month__",
+    "histogram__time_bucket__month__",
 ]
+
+_RANGE_LABEL_RE = re.compile(
+    r"^(?P<start>\d{4}-\d{2}-\d{2})_to_(?P<end>\d{4}-\d{2}-\d{2})(?:__(?P<kind>latest))?$"
+)
+
+VISUALIZATION_ORDER = {
+    "histogram": 0,
+    "calendar_view": 1,
+    "timeseries": 2,
+}
+
+CONTENT_ORDER = {
+    "task": 0,
+    "time_bucket": 1,
+    "daily_working_hours": 2,
+}
+
+PERIOD_ORDER = {
+    "week": 0,
+    "month": 1,
+    "day": 2,
+}
 
 
 @dataclass(frozen=True)
@@ -19,12 +41,12 @@ class _PlotItem:
     summary_name: str | None
 
 
-_BY_TIME_BUCKET_RE = re.compile(r"^by_time_bucket_(?P<period>week|month)_(?P<label>.+)\.png$")
-_CALENDAR_RE = re.compile(r"^calendar_(?P<period>week|month)_(?P<label>.+)\.png$")
-_TIME_BUCKETS_RE = re.compile(r"^time_buckets_(?P<label>.+)\.png$")
-_RANGE_LABEL_RE = re.compile(
-    r"^(?:(?P<kind>last)_)?(?P<start>\d{4}-\d{2}-\d{2})_to_(?P<end>\d{4}-\d{2}-\d{2})$"
-)
+@dataclass(frozen=True)
+class _ParsedPlotName:
+    visualization: str
+    content: str
+    period: str
+    label: str
 
 
 def _discover_pngs(assets_dir: Path) -> list[str]:
@@ -37,6 +59,20 @@ def _summary_for_png(assets_dir: Path, png_name: str) -> str | None:
     return candidate.name if candidate.exists() else None
 
 
+def _parse_plot_name(png_name: str) -> _ParsedPlotName | None:
+    stem = png_name[:-4]
+    parts = stem.split("__")
+    if len(parts) < 4:
+        return None
+
+    return _ParsedPlotName(
+        visualization=parts[0],
+        content=parts[1],
+        period=parts[2],
+        label="__".join(parts[3:]),
+    )
+
+
 def _resolve_front_matter_items(
     items_by_png: dict[str, _PlotItem],
 ) -> list[_PlotItem]:
@@ -47,14 +83,16 @@ def _resolve_front_matter_items(
             if selector in items_by_png:
                 selected.append(items_by_png[selector])
             continue
+
         matches = sorted(png_name for png_name in items_by_png if png_name.startswith(selector))
         if matches:
             selected.append(items_by_png[matches[-1]])
+
     return selected
 
 
 def _label_sort_key(label: str) -> tuple[int, int | str]:
-    if label == "last":
+    if label == "all_time":
         return (0, 0)
 
     match_obj = _RANGE_LABEL_RE.match(label)
@@ -62,10 +100,25 @@ def _label_sort_key(label: str) -> tuple[int, int | str]:
         start_date = match_obj.group("start")
         year_str, month_str, day_str = start_date.split("-")
         ordinal = int(year_str) * 10000 + int(month_str) * 100 + int(day_str)
-        if match_obj.group("kind") == "last":
-            return (0, -ordinal)
-        return (1, -ordinal)
-    return (2, label)
+
+        if match_obj.group("kind") == "latest":
+            return (1, -ordinal)
+
+        return (2, -ordinal)
+
+    return (3, label)
+
+
+def _visualization_sort_key(name: str) -> tuple[int, str]:
+    return (VISUALIZATION_ORDER.get(name, 999), name)
+
+
+def _content_sort_key(name: str) -> tuple[int, str]:
+    return (CONTENT_ORDER.get(name, 999), name)
+
+
+def _period_sort_key(name: str) -> tuple[int, str]:
+    return (PERIOD_ORDER.get(name, 999), name)
 
 
 def _wrap_item(item: _PlotItem, asset_prefix: str) -> str:
@@ -89,10 +142,11 @@ def _wrap_item(item: _PlotItem, asset_prefix: str) -> str:
     )
 
 
-def _section(title: str, items: Iterable[_PlotItem], asset_prefix: str) -> str:
+def _leaf_section(title: str, items: Iterable[_PlotItem], asset_prefix: str) -> str:
     items_list = list(items)
     if not items_list:
         return ""
+
     body = "\n".join(_wrap_item(item, asset_prefix=asset_prefix) for item in items_list)
     title_esc = html.escape(title)
     return (
@@ -102,6 +156,14 @@ def _section(title: str, items: Iterable[_PlotItem], asset_prefix: str) -> str:
         "</ul>\n"
         "</details>\n"
     )
+
+
+def _node_section(title: str, body: str) -> str:
+    if not body.strip():
+        return ""
+
+    title_esc = html.escape(title)
+    return f"<details>\n<summary>{title_esc}</summary>\n" f"{body}\n" "</details>\n"
 
 
 def _front_matter_section(items: Iterable[_PlotItem], asset_prefix: str) -> str:
@@ -149,48 +211,43 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
 
     featured_items = _resolve_front_matter_items(items_by_png)
 
-    timeseries: list[_PlotItem] = []
-    by_time_bucket_week: list[tuple[str, _PlotItem]] = []
-    by_time_bucket_month: list[tuple[str, _PlotItem]] = []
-    calendar_month: list[tuple[str, _PlotItem]] = []
-    time_buckets: list[_PlotItem] = []
+    tree: dict[str, dict[str, dict[str, list[tuple[str, _PlotItem]]]]] = {}
     other: list[_PlotItem] = []
 
-    for png in pngs:
-        item = items_by_png[png]
+    for png_name in pngs:
+        parsed = _parse_plot_name(png_name)
+        item = items_by_png[png_name]
 
-        if png.startswith("timeseries_"):
-            timeseries.append(item)
+        if parsed is None:
+            other.append(item)
             continue
 
-        match_obj = _BY_TIME_BUCKET_RE.match(png)
-        if match_obj:
-            period = match_obj.group("period")
-            label = match_obj.group("label")
-            if period == "week":
-                by_time_bucket_week.append((label, item))
-            else:
-                by_time_bucket_month.append((label, item))
-            continue
+        tree.setdefault(parsed.visualization, {})
+        tree[parsed.visualization].setdefault(parsed.content, {})
+        tree[parsed.visualization][parsed.content].setdefault(parsed.period, [])
+        tree[parsed.visualization][parsed.content][parsed.period].append((parsed.label, item))
 
-        match_obj = _CALENDAR_RE.match(png)
-        if match_obj:
-            period = match_obj.group("period")
-            label = match_obj.group("label")
-            if period == "month":
-                calendar_month.append((label, item))
-            continue
+    visualization_sections: list[str] = []
+    for visualization in sorted(tree.keys(), key=_visualization_sort_key):
+        content_sections: list[str] = []
 
-        match_obj = _TIME_BUCKETS_RE.match(png)
-        if match_obj:
-            time_buckets.append(item)
-            continue
+        for content in sorted(tree[visualization].keys(), key=_content_sort_key):
+            period_sections: list[str] = []
 
-        other.append(item)
+            for period in sorted(tree[visualization][content].keys(), key=_period_sort_key):
+                labeled_items = tree[visualization][content][period]
+                labeled_items.sort(key=lambda pair: _label_sort_key(pair[0]))
+                period_sections.append(
+                    _leaf_section(
+                        period,
+                        [item for _, item in labeled_items],
+                        asset_prefix,
+                    )
+                )
 
-    by_time_bucket_week.sort(key=lambda item: _label_sort_key(item[0]))
-    by_time_bucket_month.sort(key=lambda item: _label_sort_key(item[0]))
-    calendar_month.sort(key=lambda item: _label_sort_key(item[0]))
+            content_sections.append(_node_section(content, "\n".join(period_sections)))
+
+        visualization_sections.append(_node_section(visualization, "\n".join(content_sections)))
 
     html_text = """\
 <!doctype html>
@@ -221,30 +278,12 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
   %s
 
   %s
-
-  %s
-
-  %s
-
-  %s
 </body>
 </html>
 """ % (
         _front_matter_section(featured_items, asset_prefix),
-        _section("timeseries", timeseries, asset_prefix),
-        _section(
-            "by_time_bucket / week",
-            [item for _, item in by_time_bucket_week],
-            asset_prefix,
-        )
-        + _section(
-            "by_time_bucket / month",
-            [item for _, item in by_time_bucket_month],
-            asset_prefix,
-        ),
-        _section("calendar / month", [item for _, item in calendar_month], asset_prefix),
-        _section("time buckets", time_buckets, asset_prefix),
-        _section("other", other, asset_prefix),
+        "\n".join(visualization_sections),
+        _leaf_section("other", other, asset_prefix),
     )
 
     index_path = out_root / "index.html"

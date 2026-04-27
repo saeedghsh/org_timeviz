@@ -35,7 +35,7 @@ ASSETS_DIR_NAME = "assets"
 
 def _latest_label(window: TimeWindow) -> str:
     """Build a stable label for the latest rolling window."""
-    return f"last_{label_range(window)}"
+    return f"{label_range(window)}__latest"
 
 
 @dataclass(frozen=True)
@@ -128,7 +128,7 @@ def _write_calendar_report(
     top_k_tasks: int,
 ) -> None:
     """Write the calendar-like day/time plot and its summary."""
-    stem = f"calendar_{period}_{label}"
+    stem = f"calendar_view__task__{period}__{label}"
     title = f"Calendar view ({period}: {label})"
     plot_calendar_view(
         filtered_records,
@@ -149,14 +149,13 @@ def _write_window_reports(
     top_k_tasks: int,
     top_k_time_buckets: int,
 ) -> None:
-    """Write time-bucket reports and monthly calendar reports for one window."""
+    """Write time-bucket histograms and monthly calendar views for one window."""
     _write_time_bucket_report(
         aggs,
         assets_root,
-        f"by_time_bucket_{period}_{label}",
+        f"histogram__time_bucket__{period}__{label}",
         top_k=top_k_time_buckets,
     )
-
     if period == "month":
         _write_calendar_report(
             filtered_records,
@@ -189,7 +188,7 @@ def _write_time_buckets_report(
     cfg: AppConfig,
 ) -> None:
     """Write the monthly time-bucket plot and its summary."""
-    stem = "time_buckets_monthly"
+    stem = "timeseries__time_bucket__month__all_time"
     report = compute_monthly_time_buckets(filtered_records, cfg.time_buckets)
     plot_monthly_time_buckets(report, assets_root / f"{stem}.png")
     write_monthly_time_buckets_summary_json(report, assets_root / f"{stem}__summary.json")
@@ -268,6 +267,7 @@ def generate_all_reports(cfg: AppConfig) -> None:
             start=at_midnight(min_dt),
             end=at_midnight(max_dt) + timedelta(days=1),
         )
+        ts_label = "all_time"
     else:
         ts_cfg_window = window_last_n_days(now, cfg.reports.plots.timeseries_last_n_days)
         ts_window = TimeWindow(
@@ -275,12 +275,13 @@ def generate_all_reports(cfg: AppConfig) -> None:
             start=ts_cfg_window.start,
             end=ts_cfg_window.end,
         )
+        ts_label = _latest_label(ts_window)
 
     ts_records = _build_filtered_records(cfg, records, ts_window)
     _write_timeseries_report(
         _build_aggs_from_filtered(cfg, ts_records),
         assets_root,
-        "timeseries_daily_total",
+        f"timeseries__daily_working_hours__day__{ts_label}",
         rolling_days=cfg.reports.plots.timeseries_rolling_days,
     )
 
