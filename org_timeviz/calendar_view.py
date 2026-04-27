@@ -1,40 +1,45 @@
-"""Render a calendar-like day/time view from clipped Org clock records."""
+"""Render calendar-like day/time views from clipped Org clock records."""
 
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from textwrap import shorten
-from typing import Final, Iterable
+from typing import Callable, Final, Iterable
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.patches import Patch, Rectangle
 
+from .config import TimeBucketsConfig
 from .filters import ClippedRecord
+from .time_bucket_resolver import resolve_time_bucket_allocations
 
 FIGURE_HEIGHT: Final[float] = 8.0
 MIN_FIGURE_WIDTH: Final[float] = 16.0
 WIDTH_PER_DAY: Final[float] = 0.65
 COLUMN_WIDTH: Final[float] = 0.9
 OTHERS_LABEL: Final[str] = "(others)"
-MAX_CALENDAR_TASK_GROUPS: Final[int] = 12
+MAX_CALENDAR_GROUPS: Final[int] = 12
 
 
 @dataclass(frozen=True)
 class CalendarSlice:
-    """Represent one task fragment inside one calendar day."""
+    """Represent one labeled fragment inside one calendar day."""
 
     day: date
-    task: str
+    group_name: str
     start_minute: int
     end_minute: int
     minutes: int
 
 
-def build_calendar_slices(records: Iterable[ClippedRecord]) -> list[CalendarSlice]:
-    """Split clipped records into day-local task fragments."""
+def build_calendar_slices(
+    records: Iterable[ClippedRecord],
+    group_name_getter: Callable[[ClippedRecord], str],
+) -> list[CalendarSlice]:
+    """Split clipped records into day-local labeled fragments."""
     slices: list[CalendarSlice] = []
 
     for record in records:
@@ -52,7 +57,7 @@ def build_calendar_slices(records: Iterable[ClippedRecord]) -> list[CalendarSlic
                 slices.append(
                     CalendarSlice(
                         day=cur.date(),
-                        task=record.record.outline_path,
+                        group_name=group_name_getter(record),
                         start_minute=start_minute,
                         end_minute=end_minute,
                         minutes=minutes,
@@ -64,15 +69,57 @@ def build_calendar_slices(records: Iterable[ClippedRecord]) -> list[CalendarSlic
     return slices
 
 
-def plot_calendar_view(
+def plot_calendar_view_by_task(
     records: Iterable[ClippedRecord],
     out_path: Path,
     *,
     title: str,
     top_k_tasks: int,
 ) -> None:
+    """Plot a calendar-like day/time view grouped by task."""
+    _plot_calendar_view(
+        records,
+        out_path,
+        title=title,
+        legend_title="Tasks",
+        top_k_groups=top_k_tasks,
+        group_name_getter=lambda record: record.record.outline_path,
+    )
+
+
+def plot_calendar_view_by_time_bucket(
+    records: Iterable[ClippedRecord],
+    out_path: Path,
+    *,
+    title: str,
+    top_k_time_buckets: int,
+    time_buckets_cfg: TimeBucketsConfig,
+) -> None:
+    """Plot a calendar-like day/time view grouped by time bucket."""
+    _plot_calendar_view(
+        records,
+        out_path,
+        title=title,
+        legend_title="Time buckets",
+        top_k_groups=top_k_time_buckets,
+        group_name_getter=lambda record: _dominant_time_bucket(
+            record,
+            time_buckets_cfg,
+        ),
+    )
+
+
+def _plot_calendar_view(
+    records: Iterable[ClippedRecord],
+    out_path: Path,
+    *,
+    title: str,
+    legend_title: str,
+    top_k_groups: int,
+    group_name_getter: Callable[[ClippedRecord], str],
+) -> None:
     """Plot a calendar-like day/time view for clipped clock records."""
-    slices = build_calendar_slices(records)
+    slices = build_calendar_slices(records, group_name_getter)
     fig, ax = plt.subplots(figsize=_figure_size_for_days(_day_count(slices)))
 
     if not slices:
@@ -83,26 +130,29 @@ def plot_calendar_view(
         _finalize_figure(fig, out_path)
         return
 
-    slices.sort(key=lambda item: (item.day, item.start_minute, item.end_minute, item.task))
+    slices.sort(
+        key=lambda item: (
+            item.day,
+            item.start_minute,
+            item.end_minute,
+            item.group_name,
+        )
+    )
+
     unique_days = sorted({item.day for item in slices})
-    if unique_days:
-        first_day = unique_days[0]
-        last_day = unique_days[-1]
-        days = [
-            first_day + timedelta(days=offset) for offset in range((last_day - first_day).days + 1)
-        ]
-    else:
-        days = []
+    first_day = unique_days[0]
+    last_day = unique_days[-1]
+    days = [first_day + timedelta(days=offset) for offset in range((last_day - first_day).days + 1)]
 
     day_to_x = {day: index for index, day in enumerate(days)}
 
-    grouped_task_names, color_by_task = _task_groups_and_colors(
+    grouped_names, color_by_group = _groups_and_colors(
         slices,
-        top_k=min(top_k_tasks, MAX_CALENDAR_TASK_GROUPS),
+        top_k=min(top_k_groups, MAX_CALENDAR_GROUPS),
     )
 
     for item in slices:
-        grouped_task = item.task if item.task in color_by_task else OTHERS_LABEL
+        grouped_name = item.group_name if item.group_name in color_by_group else OTHERS_LABEL
         x_left = day_to_x[item.day] - (COLUMN_WIDTH / 2.0)
         y_bottom = item.start_minute / 60.0
         height = item.minutes / 60.0
@@ -111,7 +161,7 @@ def plot_calendar_view(
             (x_left, y_bottom),
             COLUMN_WIDTH,
             height,
-            facecolor=color_by_task[grouped_task],
+            facecolor=color_by_group[grouped_name],
             edgecolor="none",
         )
         ax.add_patch(patch)
@@ -133,13 +183,12 @@ def plot_calendar_view(
     ax.grid(axis="y", linestyle=":", linewidth=0.5, color="0.80")
 
     handles = [
-        Patch(facecolor=color_by_task[name], label=_legend_label(name))
-        for name in grouped_task_names
+        Patch(facecolor=color_by_group[name], label=_legend_label(name)) for name in grouped_names
     ]
     if handles:
         ax.legend(
             handles=handles,
-            title="Tasks",
+            title=legend_title,
             loc="upper left",
             bbox_to_anchor=(1.02, 1.0),
             borderaxespad=0.0,
@@ -148,6 +197,27 @@ def plot_calendar_view(
         return
 
     _finalize_figure(fig, out_path)
+
+
+def _dominant_time_bucket(
+    record: ClippedRecord,
+    time_buckets_cfg: TimeBucketsConfig,
+) -> str:
+    """Return the dominant resolved time bucket for one record."""
+    allocations = resolve_time_bucket_allocations(record.record.tags, time_buckets_cfg)
+    bucket_order_index = {
+        bucket_name: index for index, bucket_name in enumerate(time_buckets_cfg.bucket_order)
+    }
+
+    ranked_allocations = sorted(
+        allocations.items(),
+        key=lambda item: (
+            -item[1],
+            bucket_order_index.get(item[0], 999),
+            item[0],
+        ),
+    )
+    return ranked_allocations[0][0]
 
 
 def _day_count(slices: list[CalendarSlice]) -> int:
@@ -163,32 +233,32 @@ def _figure_size_for_days(day_count: int) -> tuple[float, float]:
     return (width, FIGURE_HEIGHT)
 
 
-def _task_groups_and_colors(
+def _groups_and_colors(
     slices: list[CalendarSlice],
     top_k: int,
 ) -> tuple[list[str], dict[str, str | tuple[float, float, float, float]]]:
-    """Rank tasks by total minutes and assign colors."""
-    minutes_by_task: dict[str, int] = defaultdict(int)
+    """Rank groups by total minutes and assign colors."""
+    minutes_by_group: dict[str, int] = defaultdict(int)
     for item in slices:
-        minutes_by_task[item.task] += item.minutes
+        minutes_by_group[item.group_name] += item.minutes
 
-    ranked_tasks = sorted(minutes_by_task.items(), key=lambda kv: kv[1], reverse=True)
-    top_task_names = [name for name, _ in ranked_tasks[:top_k]]
+    ranked_groups = sorted(minutes_by_group.items(), key=lambda kv: kv[1], reverse=True)
+    top_group_names = [name for name, _ in ranked_groups[:top_k]]
 
-    grouped_names = list(top_task_names)
-    if len(ranked_tasks) > len(top_task_names):
+    grouped_names = list(top_group_names)
+    if len(ranked_groups) > len(top_group_names):
         grouped_names.append(OTHERS_LABEL)
 
     color_map = plt.get_cmap("tab20")
-    color_by_task: dict[str, str | tuple[float, float, float, float]] = {}
+    color_by_group: dict[str, str | tuple[float, float, float, float]] = {}
 
-    for index, name in enumerate(top_task_names):
-        color_by_task[name] = color_map(index % color_map.N)
+    for index, name in enumerate(top_group_names):
+        color_by_group[name] = color_map(index % color_map.N)
 
     if OTHERS_LABEL in grouped_names:
-        color_by_task[OTHERS_LABEL] = "#c0c0c0"
+        color_by_group[OTHERS_LABEL] = "#c0c0c0"
 
-    return grouped_names, color_by_task
+    return grouped_names, color_by_group
 
 
 def _format_day_label(day: date) -> str:
@@ -196,9 +266,9 @@ def _format_day_label(day: date) -> str:
     return day.strftime("%a / %Y-%m-%d")
 
 
-def _legend_label(task_name: str) -> str:
-    """Shorten long task labels for the legend."""
-    return shorten(task_name, width=60, placeholder="...")
+def _legend_label(group_name: str) -> str:
+    """Shorten long legend labels."""
+    return shorten(group_name, width=60, placeholder="...")
 
 
 def _set_hour_ticks(ax: Axes) -> None:

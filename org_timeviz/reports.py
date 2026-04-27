@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from .aggregate import Aggregates, compute_aggregates
-from .calendar_view import plot_calendar_view
+from .calendar_view import plot_calendar_view_by_task, plot_calendar_view_by_time_bucket
 from .config import AppConfig
 from .emacs_agenda import read_agenda_files_from_emacs_init
 from .emacs_batch import parse_org_clock_records_emacs
@@ -118,7 +118,7 @@ def _write_time_bucket_report(
     write_summary_json(aggs, assets_root / f"{stem}__summary.json")
 
 
-def _write_calendar_report(
+def _write_task_calendar_report(
     filtered_records: list[ClippedRecord],
     aggs: Aggregates,
     assets_root: Path,
@@ -127,10 +127,10 @@ def _write_calendar_report(
     label: str,
     top_k_tasks: int,
 ) -> None:
-    """Write the calendar-like day/time plot and its summary."""
+    """Write the task calendar-view plot and its summary."""
     stem = f"calendar_view__task__{period}__{label}"
-    title = f"Calendar view ({period}: {label})"
-    plot_calendar_view(
+    title = f"Calendar view by task ({period}: {label})"
+    plot_calendar_view_by_task(
         filtered_records,
         assets_root / f"{stem}.png",
         title=title,
@@ -139,7 +139,31 @@ def _write_calendar_report(
     write_summary_json(aggs, assets_root / f"{stem}__summary.json")
 
 
+def _write_time_bucket_calendar_report(
+    filtered_records: list[ClippedRecord],
+    aggs: Aggregates,
+    assets_root: Path,
+    *,
+    period: str,
+    label: str,
+    top_k_time_buckets: int,
+    cfg: AppConfig,
+) -> None:
+    """Write the time-bucket calendar-view plot and its summary."""
+    stem = f"calendar_view__time_bucket__{period}__{label}"
+    title = f"Calendar view by time bucket ({period}: {label})"
+    plot_calendar_view_by_time_bucket(
+        filtered_records,
+        assets_root / f"{stem}.png",
+        title=title,
+        top_k_time_buckets=top_k_time_buckets,
+        time_buckets_cfg=cfg.time_buckets,
+    )
+    write_summary_json(aggs, assets_root / f"{stem}__summary.json")
+
+
 def _write_window_reports(
+    cfg: AppConfig,
     filtered_records: list[ClippedRecord],
     aggs: Aggregates,
     assets_root: Path,
@@ -149,21 +173,31 @@ def _write_window_reports(
     top_k_tasks: int,
     top_k_time_buckets: int,
 ) -> None:
-    """Write time-bucket histograms and monthly calendar views for one window."""
+    """Write time-bucket reports and monthly calendar-view reports for one window."""
     _write_time_bucket_report(
         aggs,
         assets_root,
         f"histogram__time_bucket__{period}__{label}",
         top_k=top_k_time_buckets,
     )
+
     if period == "month":
-        _write_calendar_report(
+        _write_task_calendar_report(
             filtered_records,
             aggs,
             assets_root,
             period=period,
             label=label,
             top_k_tasks=top_k_tasks,
+        )
+        _write_time_bucket_calendar_report(
+            filtered_records,
+            aggs,
+            assets_root,
+            period=period,
+            label=label,
+            top_k_time_buckets=top_k_time_buckets,
+            cfg=cfg,
         )
 
 
@@ -226,6 +260,7 @@ def generate_all_reports(cfg: AppConfig) -> None:
         filtered_records = _build_filtered_records(cfg, records, window)
         aggs = _build_aggs_from_filtered(cfg, filtered_records)
         _write_window_reports(
+            cfg,
             filtered_records,
             aggs,
             assets_root,
@@ -239,6 +274,7 @@ def generate_all_reports(cfg: AppConfig) -> None:
         filtered_records = _build_filtered_records(cfg, records, window)
         aggs = _build_aggs_from_filtered(cfg, filtered_records)
         _write_window_reports(
+            cfg,
             filtered_records,
             aggs,
             assets_root,
@@ -252,6 +288,7 @@ def generate_all_reports(cfg: AppConfig) -> None:
         filtered_records = _build_filtered_records(cfg, records, window)
         aggs = _build_aggs_from_filtered(cfg, filtered_records)
         _write_window_reports(
+            cfg,
             filtered_records,
             aggs,
             assets_root,

@@ -68,17 +68,19 @@ Generated artifacts currently include:
     and matching summary JSON
   * `calendar_view__task__month__YYYY-MM-DD_to_YYYY-MM-DD__latest.png`
     and matching summary JSON
+  * `calendar_view__time_bucket__month__YYYY-MM-DD_to_YYYY-MM-DD__latest.png`
+    and matching summary JSON
 
 * Full-range windows:
   * `histogram__time_bucket__week__YYYY-MM-DD_to_YYYY-MM-DD.png`
   * `histogram__time_bucket__month__YYYY-MM-DD_to_YYYY-MM-DD.png`
   * `calendar_view__task__month__YYYY-MM-DD_to_YYYY-MM-DD.png`
+  * `calendar_view__time_bucket__month__YYYY-MM-DD_to_YYYY-MM-DD.png`
 
-* Time series:
-  * `timeseries__daily_working_hours__day__all_time.png` or, when configured
-    for a trailing window,
-    `timeseries__daily_working_hours__day__YYYY-MM-DD_to_YYYY-MM-DD__latest.png`
-  * `timeseries__time_bucket__month__all_time.png`
+For `calendar_view__time_bucket__...`, each clocked block is colored by its
+dominant resolved time bucket after arbitration. When arbitration splits a task
+across multiple buckets, the bucket with the largest resolved share is used for
+calendar coloring.
 
 ## Time buckets from tags
 
