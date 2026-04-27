@@ -149,21 +149,23 @@ def _write_window_reports(
     top_k_tasks: int,
     top_k_time_buckets: int,
 ) -> None:
-    """Write time-bucket and calendar reports for one window."""
+    """Write time-bucket reports and monthly calendar reports for one window."""
     _write_time_bucket_report(
         aggs,
         assets_root,
         f"by_time_bucket_{period}_{label}",
         top_k=top_k_time_buckets,
     )
-    _write_calendar_report(
-        filtered_records,
-        aggs,
-        assets_root,
-        period=period,
-        label=label,
-        top_k_tasks=top_k_tasks,
-    )
+
+    if period == "month":
+        _write_calendar_report(
+            filtered_records,
+            aggs,
+            assets_root,
+            period=period,
+            label=label,
+            top_k_tasks=top_k_tasks,
+        )
 
 
 def _write_timeseries_report(

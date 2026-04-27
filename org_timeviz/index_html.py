@@ -152,7 +152,6 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
     timeseries: list[_PlotItem] = []
     by_time_bucket_week: list[tuple[str, _PlotItem]] = []
     by_time_bucket_month: list[tuple[str, _PlotItem]] = []
-    calendar_week: list[tuple[str, _PlotItem]] = []
     calendar_month: list[tuple[str, _PlotItem]] = []
     time_buckets: list[_PlotItem] = []
     other: list[_PlotItem] = []
@@ -178,9 +177,7 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
         if match_obj:
             period = match_obj.group("period")
             label = match_obj.group("label")
-            if period == "week":
-                calendar_week.append((label, item))
-            else:
+            if period == "month":
                 calendar_month.append((label, item))
             continue
 
@@ -193,7 +190,6 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
 
     by_time_bucket_week.sort(key=lambda item: _label_sort_key(item[0]))
     by_time_bucket_month.sort(key=lambda item: _label_sort_key(item[0]))
-    calendar_week.sort(key=lambda item: _label_sort_key(item[0]))
     calendar_month.sort(key=lambda item: _label_sort_key(item[0]))
 
     html_text = """\
@@ -246,8 +242,7 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
             [item for _, item in by_time_bucket_month],
             asset_prefix,
         ),
-        _section("calendar / week", [item for _, item in calendar_week], asset_prefix)
-        + _section("calendar / month", [item for _, item in calendar_month], asset_prefix),
+        _section("calendar / month", [item for _, item in calendar_month], asset_prefix),
         _section("time buckets", time_buckets, asset_prefix),
         _section("other", other, asset_prefix),
     )

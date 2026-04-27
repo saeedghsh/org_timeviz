@@ -51,15 +51,12 @@ them. Each plot also has a matching JSON summary next to it.
     `by_time_bucket_week_last_YYYY-MM-DD_to_YYYY-MM-DD__summary.json`
   * `by_time_bucket_month_last_YYYY-MM-DD_to_YYYY-MM-DD.png` and
     `by_time_bucket_month_last_YYYY-MM-DD_to_YYYY-MM-DD__summary.json`
-  * `calendar_week_last_YYYY-MM-DD_to_YYYY-MM-DD.png` and
-    `calendar_week_last_YYYY-MM-DD_to_YYYY-MM-DD__summary.json`
   * `calendar_month_last_YYYY-MM-DD_to_YYYY-MM-DD.png` and
     `calendar_month_last_YYYY-MM-DD_to_YYYY-MM-DD__summary.json`
 
 * Full-range windows (one per period):
   * `by_time_bucket_week_YYYY-MM-DD_to_YYYY-MM-DD.png`
   * `by_time_bucket_month_YYYY-MM-DD_to_YYYY-MM-DD.png`
-  * `calendar_week_YYYY-MM-DD_to_YYYY-MM-DD.png`
   * `calendar_month_YYYY-MM-DD_to_YYYY-MM-DD.png`
 
 * Time series:
