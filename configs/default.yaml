@@ -36,6 +36,7 @@ time_buckets:
     - msc
     - hh
     - holidays_vacations
+    - sick_leave
     - other
 
   tag_to_bucket:
@@ -48,6 +49,7 @@ time_buckets:
     hh: hh
     ite: hh
     isdd: hh
+    sick_leave: sick_leave
     holidays: holidays_vacations
     vacations: holidays_vacations
 
@@ -62,6 +64,7 @@ time_buckets:
       - msc
       - hh
       - holidays_vacations
+      - sick_leave
       - other
 
     # Used only for split_weighted. Leaving this empty means equal split.
