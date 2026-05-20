@@ -25,6 +25,10 @@ ensure-env: ## Ensure the conda env exists (create it if missing).
 run: ensure-env ## Run `python -m main` inside the repo conda env.
 	@$(RUN_IN_CONDA_ENV) python -m main
 
+.PHONY: other_catalogue
+other_catalogue: ensure-env ## Write CSV of unmapped tags contributing to the other time bucket.
+	@$(RUN_IN_CONDA_ENV) python -m org_timeviz.other_catalogue
+
 ########################################
 ###################### CONDA ENVIRONMENT
 ########################################

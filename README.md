@@ -11,6 +11,25 @@ source of truth.
 * Resolves configured time-bucket allocations from tags
 * Generates plots and a `summary.json` per report
 
+## Other catalogue
+
+When new Org tags are not mapped under `time_buckets.tag_to_bucket`, time may
+start accumulating under the `other` time bucket. To inspect which unmapped tags
+are contributing to `other`, run:
+
+```bash
+make other_catalogue
+```
+
+This writes `other_catalogue.csv` under the configured output directory. The CSV
+has two columns:
+
+* `tag`: an unmapped Org tag found on records assigned to `other`
+* `hours`: total clocked hours for records carrying that tag
+
+Only records that resolve fully to the configured `other_bucket` are included.
+If a record has no tags at all, it is reported under `(no-tag)`.
+
 ## Configuration
 
 The config file is a single YAML (default: `configs/default.yaml`). Reports are
