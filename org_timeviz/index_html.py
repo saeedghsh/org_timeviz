@@ -8,6 +8,11 @@ from typing import Iterable
 
 INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME = "interactive__time_bucket.html"
 
+DEPRECATED_PNG_PREFIXES = (
+    "calendar_view__time_bucket__",
+    "histogram__time_bucket__",
+)
+
 FRONT_MATTER_SELECTORS = [
     "timeseries__time_bucket__month__all_time.png",
     "timeseries__daily_working_hours__day__all_time.png",
@@ -51,7 +56,11 @@ class _ParsedPlotName:
 
 
 def _discover_pngs(assets_dir: Path) -> list[str]:
-    return sorted([path_obj.name for path_obj in assets_dir.glob("*.png")])
+    return sorted(
+        path_obj.name
+        for path_obj in assets_dir.glob("*.png")
+        if not path_obj.name.startswith(DEPRECATED_PNG_PREFIXES)
+    )
 
 
 def _summary_for_png(assets_dir: Path, png_name: str) -> str | None:

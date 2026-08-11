@@ -12,9 +12,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.patches import Patch, Rectangle
 
-from .config import TimeBucketsConfig
 from .filters import ClippedRecord
-from .time_bucket_resolver import resolve_time_bucket_allocations
 
 FIGURE_HEIGHT: Final[float] = 8.0
 MIN_FIGURE_WIDTH: Final[float] = 16.0
@@ -84,28 +82,6 @@ def plot_calendar_view_by_task(
         legend_title="Tasks",
         top_k_groups=top_k_tasks,
         group_name_getter=lambda record: record.record.outline_path,
-    )
-
-
-def plot_calendar_view_by_time_bucket(
-    records: Iterable[ClippedRecord],
-    out_path: Path,
-    *,
-    title: str,
-    top_k_time_buckets: int,
-    time_buckets_cfg: TimeBucketsConfig,
-) -> None:
-    """Plot a calendar-like day/time view grouped by time bucket."""
-    _plot_calendar_view(
-        records,
-        out_path,
-        title=title,
-        legend_title="Time buckets",
-        top_k_groups=top_k_time_buckets,
-        group_name_getter=lambda record: _dominant_time_bucket(
-            record,
-            time_buckets_cfg,
-        ),
     )
 
 
@@ -197,27 +173,6 @@ def _plot_calendar_view(
         return
 
     _finalize_figure(fig, out_path)
-
-
-def _dominant_time_bucket(
-    record: ClippedRecord,
-    time_buckets_cfg: TimeBucketsConfig,
-) -> str:
-    """Return the dominant resolved time bucket for one record."""
-    allocations = resolve_time_bucket_allocations(record.record.tags, time_buckets_cfg)
-    bucket_order_index = {
-        bucket_name: index for index, bucket_name in enumerate(time_buckets_cfg.bucket_order)
-    }
-
-    ranked_allocations = sorted(
-        allocations.items(),
-        key=lambda item: (
-            -item[1],
-            bucket_order_index.get(item[0], 999),
-            item[0],
-        ),
-    )
-    return ranked_allocations[0][0]
 
 
 def _day_count(slices: list[CalendarSlice]) -> int:

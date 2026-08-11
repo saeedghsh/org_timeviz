@@ -92,22 +92,6 @@ def _rolling_workday_average(
     return out
 
 
-def plot_bar_by_time_bucket(aggs: Aggregates, out_path: Path, top_k: int) -> None:
-    """Plot a bar chart of total hours per time bucket."""
-    pairs = _top_k_with_others(aggs.minutes_by_time_bucket, top_k)
-    labels = [pair[0] for pair in pairs]
-    values = [_minutes_to_hours(pair[1]) for pair in pairs]
-
-    fig, ax = plt.subplots(figsize=FIGSIZE)
-    ax.bar(labels, values)
-    _set_xtick_style(ax, rotation=45)
-
-    ax.set_ylabel("Hours")
-    ax.set_title("Total hours by time bucket")
-
-    _finalize_figure(fig, out_path)
-
-
 def plot_bar_by_task(aggs: Aggregates, out_path: Path, top_k: int) -> None:
     """Plot a bar chart of total hours per task (outline path)."""
     task_minutes = {label: float(value) for label, value in aggs.minutes_by_task.items()}
