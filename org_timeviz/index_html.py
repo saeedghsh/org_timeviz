@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME = "interactive__time_bucket.html"
+
 FRONT_MATTER_SELECTORS = [
-    "calendar_view__time_bucket__month__",
-    "histogram__time_bucket__month__",
     "timeseries__time_bucket__month__all_time.png",
     "timeseries__daily_working_hours__day__all_time.png",
 ]
@@ -140,12 +140,35 @@ def _wrap_gallery_item(item: _PlotItem, asset_prefix: str) -> str:
     )
 
 
-def _front_matter_section(items: Iterable[_PlotItem], asset_prefix: str) -> str:
-    items_list = list(items)
-    if not items_list:
+def _wrap_interactive_time_bucket(asset_prefix: str) -> str:
+    dashboard_href = html.escape(f"{asset_prefix}/{INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME}")
+    return (
+        '<section class="gallery-item">\n'
+        "  <h2>calendar_view / histogram__time_bucket</h2>\n"
+        f'  <div class="links"><a href="{dashboard_href}">open interactive view</a></div>\n'
+        f'  <iframe class="interactive-dashboard" src="{dashboard_href}" '
+        'title="Interactive calendar and time-bucket histogram"></iframe>\n'
+        "</section>\n"
+    )
+
+
+def _front_matter_section(
+    items: Iterable[_PlotItem],
+    asset_prefix: str,
+    *,
+    include_interactive_time_bucket: bool,
+) -> str:
+    body_parts: list[str] = []
+    if include_interactive_time_bucket:
+        body_parts.append(_wrap_interactive_time_bucket(asset_prefix))
+
+    body_parts.extend(
+        _wrap_gallery_item(item, asset_prefix=asset_prefix) for item in items
+    )
+    if not body_parts:
         return ""
 
-    body = "\n".join(_wrap_gallery_item(item, asset_prefix=asset_prefix) for item in items_list)
+    body = "\n".join(body_parts)
     return (
         '<section class="featured-gallery">\n'
         "  <h1>Featured plots</h1>\n"
@@ -262,6 +285,9 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
 
     pngs = _discover_pngs(assets_dir)
     asset_prefix = assets_dir.name
+    interactive_time_bucket_exists = (
+        assets_dir / INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME
+    ).exists()
 
     items_by_png = {
         png_name: _PlotItem(
@@ -357,6 +383,7 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
     h1 { font-size: 22px; margin: 0 0 16px 0; }
     h2 { font-size: 18px; margin: 0 0 8px 0; }
     .plot { display: block; max-width: 100%%; height: auto; margin: 8px 0 0 0; border: 1px solid #ddd; }
+    .interactive-dashboard { display: block; width: 100%%; height: 1100px; margin: 8px 0 0 0; border: 1px solid #ddd; }
     .links { margin-top: 6px; }
     .featured-gallery { margin-bottom: 28px; }
     .gallery-item { margin: 0 0 28px 0; }
@@ -382,7 +409,11 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
 </body>
 </html>
 """ % (
-        _front_matter_section(featured_items, asset_prefix),
+        _front_matter_section(
+            featured_items,
+            asset_prefix,
+            include_interactive_time_bucket=interactive_time_bucket_exists,
+        ),
         "\n".join(visualization_nodes),
     )
 

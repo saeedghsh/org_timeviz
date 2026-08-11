@@ -12,7 +12,8 @@ from .config import AppConfig
 from .emacs_agenda import read_agenda_files_from_emacs_init
 from .emacs_batch import parse_org_clock_records_emacs
 from .filters import ClippedRecord, apply_filters, clip_to_window
-from .index_html import write_index_html
+from .index_html import INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME, write_index_html
+from .interactive_time_bucket import write_interactive_time_bucket_dashboard
 from .models import ClockRecord
 from .plots import plot_bar_by_time_bucket, plot_timeseries_daily_total, write_summary_json
 from .time_buckets import (
@@ -329,6 +330,15 @@ def generate_all_reports(cfg: AppConfig) -> None:
     )
     all_time_records = _build_filtered_records(cfg, records, all_time_window)
     _write_time_buckets_report(all_time_records, assets_root, cfg)
+
+    initial_interactive_window = window_last_n_days(now, 30)
+    write_interactive_time_bucket_dashboard(
+        all_time_records,
+        assets_root / INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME,
+        time_buckets_cfg=cfg.time_buckets,
+        initial_start=initial_interactive_window.start,
+        initial_end=initial_interactive_window.end,
+    )
 
     _LOG.info("Wrote report artifacts to %s", assets_root)
 
