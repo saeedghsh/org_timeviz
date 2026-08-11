@@ -217,8 +217,15 @@ clear and configurable reporting view of time allocation.
 
 ## Laundry List
 
+- [ ] the latest month view on the front page index.html are not
+      latest, they are the last month, so at the beginning of a month
+      we only see few days.
+- [ ] index correctly lists all the plots, but very often those are
+      outdated.
 - [ ] the timeseries is nice, but maybe a representation that also show
       tasks/tags which have been the focus in each period.
+- [ ] make `calendar_view__time_bucket` interactive, so when hovering
+      over a block, it shows the actual task.
 
 ## License
 
