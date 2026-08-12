@@ -11,6 +11,7 @@ source of truth.
 * Resolves configured time-bucket allocations from tags
 * Generates static plots, an interactive time-bucket dashboard, an HTML index,
   and JSON summaries for static reports
+* Serves live text clock reports above the plots when using `make serve`
 
 ## Running and refreshing reports
 
@@ -32,6 +33,39 @@ at the top. Clicking it regenerates all report artifacts using the same config
 and reloads the page when generation finishes. Static files are served with
 caching disabled so regenerated plots are fetched immediately.
 
+### Live clock dashboard
+
+When the page is served through `make serve`, a text dashboard appears above the
+plots with:
+
+* suspicious clocks across the agenda files: malformed lines, open clocks,
+  declared-duration mismatches, and overlapping intervals
+* chronological clock entries for a selected day
+* total logged time for an independently selected day
+* total logged time for the Monday-to-Sunday week containing a selected date
+
+The chronological, daily-total, and weekly selectors each default to today and
+can be changed independently. Live clocks are included through the current time
+in all three reports.
+
+These reports deliberately reuse the clock helpers from the configured Emacs
+setup rather than reimplementing their semantics in Python. The configured
+`org_sources.emacs_init_paths` must therefore include the file that directly
+defines `my/org-clock-suspects`, `my/org-clocklog-rows`, and the associated
+formatting helpers; with the default configuration this can be
+`~/.emacs.d/lisp/init-org.el`. The suspect report uses `my/org-clock-suspects`
+for the existing clock-line checks and supplements it with an overlap scan.
+
+Dashboard reads are non-mutating. Before opening agenda files in the batch Emacs
+process, org-timeviz disables `my/org-auto-resolve-dangling-clocks` when that
+variable exists, so viewing the dashboard does not automatically resolve or
+rewrite dangling clocks.
+
+Changing any clock-dashboard date automatically refreshes the text reports. Use
+**Refresh clock reports** to reload them without changing a date, for example
+after correcting a suspicious clock in Org. This does not regenerate the plots;
+use **Refresh reports** when the plots themselves need to be regenerated.
+
 Use a different port when needed:
 
 ```bash
@@ -47,9 +81,10 @@ make run
 firefox outputs/index.html
 ```
 
-When `index.html` is opened directly through `file://`, the refresh button is
-disabled because browsers cannot invoke the local report generator from a file
-URL. In that mode, run `make run` again whenever the reports need updating.
+When `index.html` is opened directly through `file://`, the refresh button and
+live clock dashboard are disabled because browsers cannot invoke the local
+report generator from a file URL. In that mode, run `make run` again whenever
+the reports need updating.
 
 ## Other catalogue
 

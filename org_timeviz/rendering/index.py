@@ -318,6 +318,131 @@ def _refresh_controls_html() -> str:
 """
 
 
+def _clock_dashboard_html() -> str:
+    """Render live text clock reports and date/week controls."""
+    return """\
+  <section class="clock-dashboard">
+    <div class="clock-dashboard-heading">
+      <h1>Clock dashboard</h1>
+      <div class="clock-dashboard-actions">
+        <button id="refresh-clock-dashboard" type="button">Refresh clock reports</button>
+        <span id="clock-dashboard-status" role="status"></span>
+      </div>
+    </div>
+    <p class="clock-dashboard-note">
+      Live clocks are counted through the current time. Changing the date or week updates only
+      these text reports; it does not regenerate the plots below.
+    </p>
+
+    <article class="clock-report">
+      <h2>Suspicious clocks</h2>
+      <pre><code id="clock-suspects">Loading...</code></pre>
+    </article>
+
+    <article class="clock-report">
+      <div class="clock-report-heading">
+        <h2>Chronological entries</h2>
+        <label>Day <input id="clock-day" type="date" /></label>
+      </div>
+      <pre><code id="clock-chronological">Loading...</code></pre>
+    </article>
+
+    <article class="clock-report compact-clock-report">
+      <div class="clock-report-heading">
+        <h2>Total time logged — day</h2>
+        <label>Day <input id="clock-day-total-date" type="date" /></label>
+      </div>
+      <pre><code id="clock-day-total">Loading...</code></pre>
+    </article>
+
+    <article class="clock-report compact-clock-report">
+      <div class="clock-report-heading">
+        <h2>Total time logged — week</h2>
+        <label>Week containing <input id="clock-week-date" type="date" /></label>
+      </div>
+      <pre><code id="clock-week-total">Loading...</code></pre>
+    </article>
+  </section>
+  <script>
+    (() => {
+      const dayInput = document.getElementById("clock-day");
+      const dayTotalDateInput = document.getElementById("clock-day-total-date");
+      const weekDateInput = document.getElementById("clock-week-date");
+      const refreshButton = document.getElementById("refresh-clock-dashboard");
+      const dashboardStatus = document.getElementById("clock-dashboard-status");
+      const suspects = document.getElementById("clock-suspects");
+      const chronological = document.getElementById("clock-chronological");
+      const dayTotal = document.getElementById("clock-day-total");
+      const weekTotal = document.getElementById("clock-week-total");
+      const outputs = [suspects, chronological, dayTotal, weekTotal];
+
+      function localDateValue(value) {
+        const year = value.getFullYear();
+        const month = String(value.getMonth() + 1).padStart(2, "0");
+        const day = String(value.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      }
+
+      function setAll(message) {
+        for (const output of outputs) {
+          output.textContent = message;
+        }
+      }
+
+      async function loadClockDashboard() {
+        setAll("Loading...");
+        refreshButton.disabled = true;
+        dashboardStatus.textContent = "Refreshing...";
+        const params = new URLSearchParams({
+          date: dayInput.value,
+          day_total_date: dayTotalDateInput.value,
+          week_date: weekDateInput.value,
+        });
+
+        try {
+          const response = await fetch(`/clock-dashboard?${params}`, {cache: "no-store"});
+          if (!response.ok) {
+            throw new Error(`server returned HTTP ${response.status}`);
+          }
+          const payload = await response.json();
+          suspects.textContent = payload.suspects;
+          chronological.textContent = payload.chronological;
+          dayTotal.textContent = `${payload.day_total_day}: ${payload.day_total}`;
+          weekTotal.textContent = `${payload.week_start} to ${payload.week_end}: ${payload.week_total}`;
+          dashboardStatus.textContent = "";
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          setAll(`Clock dashboard failed: ${message}`);
+          dashboardStatus.textContent = `Refresh failed: ${message}`;
+        } finally {
+          refreshButton.disabled = false;
+        }
+      }
+
+      const now = new Date();
+      dayInput.value = localDateValue(now);
+      dayTotalDateInput.value = localDateValue(now);
+      weekDateInput.value = localDateValue(now);
+
+      if (window.location.protocol === "file:") {
+        dayInput.disabled = true;
+        dayTotalDateInput.disabled = true;
+        weekDateInput.disabled = true;
+        refreshButton.disabled = true;
+        setAll("Clock dashboard requires make serve.");
+        return;
+      }
+
+      dayInput.addEventListener("change", loadClockDashboard);
+      dayTotalDateInput.addEventListener("change", loadClockDashboard);
+      weekDateInput.addEventListener("change", loadClockDashboard);
+      refreshButton.addEventListener("click", loadClockDashboard);
+      loadClockDashboard();
+    })();
+  </script>
+"""
+
+
 def write_index_html(out_root: Path, assets_dir: Path) -> Path:
     """Write outputs/index.html and leaf gallery pages for current artifacts."""
     out_root.mkdir(parents=True, exist_ok=True)
@@ -429,6 +554,20 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
     .refresh-controls button { padding: 8px 14px; cursor: pointer; }
     .refresh-controls button:disabled { cursor: default; opacity: 0.6; }
     #refresh-status { color: #555; }
+    .clock-dashboard { margin: 0 0 36px 0; }
+    .clock-dashboard-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .clock-dashboard-actions { display: flex; align-items: center; gap: 10px; }
+    .clock-dashboard-actions button { padding: 7px 12px; cursor: pointer; }
+    .clock-dashboard-actions button:disabled { cursor: default; opacity: 0.6; }
+    #clock-dashboard-status { color: #555; }
+    .clock-dashboard-note { color: #555; margin: -6px 0 18px 0; }
+    .clock-report { margin: 0 0 22px 0; }
+    .compact-clock-report { max-width: 720px; }
+    .clock-report-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .clock-report-heading label { white-space: nowrap; }
+    .clock-report-heading input { margin-left: 6px; }
+    .clock-report pre { overflow-x: auto; margin: 8px 0 0 0; padding: 12px; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; }
+    .clock-report code { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
     .outputs-section { margin-top: 40px; }
     .tree { list-style: none; padding-left: 0; margin: 0; }
     .tree ul { list-style: none; margin: 4px 0 0 0; }
@@ -444,6 +583,8 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
 
   %s
 
+  %s
+
   <section class="outputs-section">
     <h1>org-timeviz outputs</h1>
     <ul class="tree">
@@ -454,6 +595,7 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
 </html>
 """ % (
         _refresh_controls_html(),
+        _clock_dashboard_html(),
         _front_matter_section(
             featured_items,
             asset_prefix,
