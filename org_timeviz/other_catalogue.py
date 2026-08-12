@@ -3,19 +3,17 @@
 import argparse
 import csv
 import logging
-import os
 import sys
-from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from typing import Sequence
 
 from .config import AppConfig
-from .emacs_agenda import read_agenda_files_from_emacs_init
-from .emacs_batch import parse_org_clock_records_emacs
 from .filters import ClippedRecord, apply_filters, clip_to_window
 from .logging_utils import setup_logger
 from .models import ClockRecord
+from .org_source.emacs import parse_org_clock_records_emacs
+from .org_source.inputs import configure_emacs_init, resolve_org_inputs
 from .time_bucket_resolver import resolve_time_bucket_allocations
 from .time_windows import TimeWindow, at_midnight
 
@@ -24,20 +22,12 @@ NO_TAG_LABEL = "(no-tag)"
 OUTPUT_FILENAME = "other_catalogue.csv"
 
 
-@dataclass(frozen=True)
-class OrgInputs:
-    """Hold resolved Org files and the Emacs init path used for discovery."""
-
-    org_files: list[Path]
-    agenda_init_path: Path | None
-
-
 def generate_other_catalogue(cfg: AppConfig) -> Path:
     """Write a CSV of unmapped tags contributing to the other time bucket."""
-    inputs = _resolve_org_inputs(cfg)
+    inputs = resolve_org_inputs(cfg)
     _LOG.info("Using %s org file(s)", len(inputs.org_files))
 
-    _set_emacs_init_env(cfg, inputs.agenda_init_path)
+    configure_emacs_init(cfg, inputs.agenda_init_path)
 
     records = parse_org_clock_records_emacs(org_files=inputs.org_files)
     out_root = Path(cfg.app.output_dir).expanduser().resolve()
@@ -67,57 +57,6 @@ def _filter_all_time_records(
     )
     clipped = clip_to_window(records, window=window)
     return apply_filters(clipped, cfg=cfg.reports.filters)
-
-
-def _resolve_org_inputs(cfg: AppConfig) -> OrgInputs:
-    """Resolve Org files from explicit paths or configured Emacs agenda files."""
-    if cfg.org_sources.mode == "explicit":
-        org_files = [Path(path_str).expanduser() for path_str in cfg.org_sources.explicit_files]
-        agenda_init_path = _first_existing_init_path(cfg.org_sources.emacs_init_paths)
-        return OrgInputs(org_files=org_files, agenda_init_path=agenda_init_path)
-
-    for path_str in cfg.org_sources.emacs_init_paths:
-        init_path = Path(path_str).expanduser()
-        result = read_agenda_files_from_emacs_init(
-            init_path,
-            var_name=cfg.org_sources.emacs_agenda_var,
-        )
-        if result is not None and result.files:
-            return OrgInputs(org_files=result.files, agenda_init_path=result.source_path)
-
-    raise FileNotFoundError(
-        "Could not find org-agenda-files in any of: " + ", ".join(cfg.org_sources.emacs_init_paths)
-    )
-
-
-def _first_existing_init_path(paths: list[str]) -> Path | None:
-    """Return the first existing Emacs init path from a configured list."""
-    for path_str in paths:
-        path_obj = Path(path_str).expanduser()
-        if path_obj.exists():
-            return path_obj
-    return None
-
-
-def _set_emacs_init_env(cfg: AppConfig, preferred_init_path: Path | None) -> None:
-    """Set the init-file environment variable used by the Emacs batch exporter."""
-    candidates: list[Path] = []
-    if preferred_init_path is not None:
-        candidates.append(preferred_init_path)
-
-    for path_str in cfg.org_sources.emacs_init_paths:
-        path_obj = Path(path_str).expanduser()
-        if path_obj.exists() and path_obj not in candidates:
-            candidates.append(path_obj)
-
-    for init_path in candidates:
-        if init_path.exists():
-            os.environ["ORG_TIMEVIZ_EMACS_INIT"] = str(init_path)
-            os.environ.pop("ORG_TIMEVIZ_TODO_KEYWORDS", None)
-            return
-
-    os.environ.pop("ORG_TIMEVIZ_EMACS_INIT", None)
-    os.environ.pop("ORG_TIMEVIZ_TODO_KEYWORDS", None)
 
 
 def _compute_other_catalogue_hours(

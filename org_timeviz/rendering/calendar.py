@@ -12,7 +12,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.patches import Patch, Rectangle
 
-from .filters import ClippedRecord
+from ..filters import ClippedRecord
 
 FIGURE_HEIGHT: Final[float] = 8.0
 MIN_FIGURE_WIDTH: Final[float] = 16.0

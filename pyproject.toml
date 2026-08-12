@@ -10,6 +10,12 @@ dependencies = [
   "plotly>=6.0",
 ]
 
+[project.scripts]
+org-timeviz = "org_timeviz.cli:main"
+
+[tool.setuptools.package-data]
+"org_timeviz.org_source" = ["elisp/*.el"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --cov=. --cov-report=term-missing"

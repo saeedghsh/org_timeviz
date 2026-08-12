@@ -11,10 +11,10 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from .config import TimeBucketsConfig
-from .filters import ClippedRecord
-from .time_bucket_resolver import resolve_time_bucket_allocations
-from .time_windows import month_start, next_month_start
+from ..config import TimeBucketsConfig
+from ..filters import ClippedRecord
+from ..time_bucket_resolver import resolve_time_bucket_allocations
+from ..time_windows import month_start, next_month_start
 
 FIGSIZE: Final[tuple[float, float]] = (22.0, 10.0)
 

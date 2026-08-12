@@ -1,26 +1,24 @@
 """Orchestrate parsing, filtering, aggregation, and artifact generation."""
 
 import logging
-import os
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from .aggregate import Aggregates, compute_aggregates
-from .calendar_view import plot_calendar_view_by_task
 from .config import AppConfig
-from .emacs_agenda import read_agenda_files_from_emacs_init
-from .emacs_batch import parse_org_clock_records_emacs
 from .filters import ClippedRecord, apply_filters, clip_to_window
-from .index_html import INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME, write_index_html
-from .interactive_time_bucket import write_interactive_time_bucket_dashboard
 from .models import ClockRecord
-from .plots import plot_timeseries_daily_total, write_summary_json
-from .time_buckets import (
+from .org_source.emacs import parse_org_clock_records_emacs
+from .org_source.inputs import configure_emacs_init, resolve_org_inputs
+from .rendering.calendar import plot_calendar_view_by_task
+from .rendering.index import INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME, write_index_html
+from .rendering.interactive_time_bucket import write_interactive_time_bucket_dashboard
+from .rendering.monthly_time_buckets import (
     compute_monthly_time_buckets,
     plot_monthly_time_buckets,
     write_monthly_time_buckets_summary_json,
 )
+from .rendering.plots import plot_timeseries_daily_total, write_summary_json
 from .time_windows import (
     TimeWindow,
     at_midnight,
@@ -36,60 +34,6 @@ ASSETS_DIR_NAME = "assets"
 def _latest_label(window: TimeWindow) -> str:
     """Build a stable label for the latest rolling window."""
     return f"{label_range(window)}__latest"
-
-
-@dataclass(frozen=True)
-class _OrgInputs:
-    org_files: list[Path]
-    agenda_init_path: Path | None
-
-
-def _first_existing_init_path(paths: list[str]) -> Path | None:
-    for path_str in paths:
-        path_obj = Path(path_str).expanduser()
-        if path_obj.exists():
-            return path_obj
-    return None
-
-
-def _resolve_org_inputs(cfg: AppConfig) -> _OrgInputs:
-    if cfg.org_sources.mode == "explicit":
-        org_files = [Path(path_str).expanduser() for path_str in cfg.org_sources.explicit_files]
-        agenda_init_path = _first_existing_init_path(cfg.org_sources.emacs_init_paths)
-        return _OrgInputs(org_files=org_files, agenda_init_path=agenda_init_path)
-
-    for path_str in cfg.org_sources.emacs_init_paths:
-        init_path = Path(path_str).expanduser()
-        result = read_agenda_files_from_emacs_init(
-            init_path,
-            var_name=cfg.org_sources.emacs_agenda_var,
-        )
-        if result is not None and result.files:
-            return _OrgInputs(org_files=result.files, agenda_init_path=result.source_path)
-
-    raise FileNotFoundError(
-        "Could not find org-agenda-files in any of: " + ", ".join(cfg.org_sources.emacs_init_paths)
-    )
-
-
-def _set_emacs_init_env(cfg: AppConfig, preferred_init_path: Path | None) -> None:
-    candidates: list[Path] = []
-    if preferred_init_path is not None:
-        candidates.append(preferred_init_path)
-
-    for path_str in cfg.org_sources.emacs_init_paths:
-        path_obj = Path(path_str).expanduser()
-        if path_obj.exists() and path_obj not in candidates:
-            candidates.append(path_obj)
-
-    for init_path in candidates:
-        if init_path.exists():
-            os.environ["ORG_TIMEVIZ_EMACS_INIT"] = str(init_path)
-            os.environ.pop("ORG_TIMEVIZ_TODO_KEYWORDS", None)
-            return
-
-    os.environ.pop("ORG_TIMEVIZ_EMACS_INIT", None)
-    os.environ.pop("ORG_TIMEVIZ_TODO_KEYWORDS", None)
 
 
 def _build_filtered_records(
@@ -157,10 +101,10 @@ def generate_all_reports(cfg: AppConfig) -> None:
     """Generate the fixed set of reports and write artifacts under the output root."""
     now = datetime.now()
 
-    inputs = _resolve_org_inputs(cfg)
+    inputs = resolve_org_inputs(cfg)
     _LOG.info("Using %s org file(s)", len(inputs.org_files))
 
-    _set_emacs_init_env(cfg, inputs.agenda_init_path)
+    configure_emacs_init(cfg, inputs.agenda_init_path)
 
     records = parse_org_clock_records_emacs(org_files=inputs.org_files)
     if not records:

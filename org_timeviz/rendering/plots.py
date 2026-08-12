@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from .aggregate import Aggregates
+from ..aggregate import Aggregates
 
 FIGSIZE: Final[tuple[float, float]] = (20.0, 12.0)
 TIMESERIES_MAIN_COLOR: Final[str] = "tab:blue"

@@ -22,8 +22,8 @@ ensure-env: ## Ensure the conda env exists (create it if missing).
 		|| (echo "conda env '$(ENV_NAME)' not found; creating..." && $(MAKE) create-env)
 
 .PHONY: run
-run: ensure-env ## Run `python -m main` inside the repo conda env.
-	@$(RUN_IN_CONDA_ENV) python -m main
+run: ensure-env ## Generate reports inside the repo conda env.
+	@$(RUN_IN_CONDA_ENV) python -m org_timeviz
 
 .PHONY: other_catalogue
 other_catalogue: ensure-env ## Write CSV of unmapped tags contributing to the other time bucket.

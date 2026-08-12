@@ -11,9 +11,9 @@ from matplotlib import colormaps
 from matplotlib.colors import to_hex
 from plotly.offline import get_plotlyjs
 
-from .config import TimeBucketsConfig
-from .filters import ClippedRecord
-from .time_bucket_resolver import resolve_time_bucket_allocations
+from ..config import TimeBucketsConfig
+from ..filters import ClippedRecord
+from ..time_bucket_resolver import resolve_time_bucket_allocations
 
 DAY_WIDTH_MS: Final[float] = 0.90 * 24.0 * 60.0 * 60.0 * 1000.0
 CALENDAR_HEIGHT: Final[int] = 650
