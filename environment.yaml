@@ -6,11 +6,9 @@ channels:
 
 dependencies:
   - python=3.12
-  - pylint
   - pytest
   - pytest-cov
-  - black
-  - isort
+  - ruff
   - mypy
   - pydantic>=2.11
   - pyyaml>=6.0

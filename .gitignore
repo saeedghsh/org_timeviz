@@ -4,7 +4,7 @@ __pycache__/
 .conda/
 .mypy_cache/
 .pytest_cache/
-.pylint.d/
+.ruff_cache/
 .coverage
 
 .vscode/

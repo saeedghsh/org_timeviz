@@ -64,14 +64,24 @@ coverage: ensure-env
 	@$(RUN_IN_CONDA_ENV) coverage report -m
 
 .PHONY: formatter
-formatter: ensure-env ## Check code formatting.
+formatter: ensure-env ## Check code formatting with Ruff.
 	@echo "\n=== Checking code formatting ==="
-	@$(RUN_IN_CONDA_ENV) black --check .	
+	@$(RUN_IN_CONDA_ENV) ruff format --check .
+
+.PHONY: format
+format: ensure-env ## Format Python code with Ruff.
+	@echo "\n=== Formatting Python files ==="
+	@$(RUN_IN_CONDA_ENV) ruff format .
 
 .PHONY: linter
-linter: ensure-env ## Run the linter.
-	@echo "\n=== Linting Python files (all) ==="
-	@$(RUN_IN_CONDA_ENV) pylint $(shell git ls-files '*.py')
+linter: ensure-env ## Run Ruff lint checks.
+	@echo "\n=== Linting Python files ==="
+	@$(RUN_IN_CONDA_ENV) ruff check .
+
+.PHONY: lint-fix
+lint-fix: ensure-env ## Apply Ruff's safe automatic lint fixes.
+	@echo "\n=== Applying Ruff lint fixes ==="
+	@$(RUN_IN_CONDA_ENV) ruff check --fix .
 
 MYPY_OPTS = --install-types --non-interactive --explicit-package-bases --config-file=pyproject.toml --show-error-codes
 
@@ -81,7 +91,8 @@ type-check: ensure-env ## Run static type checking.
 	@$(RUN_IN_CONDA_ENV) mypy $(MYPY_OPTS) .
 
 .PHONY: code-quality
-code-quality: ## Run the main code-quality checks (formatting, linting, typing).
-	-@$(MAKE) formatter
-	-@$(MAKE) type-check
-	-@$(MAKE) linter
+code-quality: ## Run formatting, linting, typing, and unit tests.
+	@$(MAKE) formatter
+	@$(MAKE) linter
+	@$(MAKE) type-check
+	@$(MAKE) test
