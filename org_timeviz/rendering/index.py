@@ -275,6 +275,49 @@ def _tree_visualization_node(
     )
 
 
+def _refresh_controls_html() -> str:
+    """Render browser controls for regenerating reports through the local server."""
+    return """\
+  <section class="refresh-controls">
+    <button id="refresh-reports" type="button">Refresh reports</button>
+    <span id="refresh-status" role="status"></span>
+  </section>
+  <script>
+    (() => {
+      const button = document.getElementById("refresh-reports");
+      const status = document.getElementById("refresh-status");
+
+      if (window.location.protocol === "file:") {
+        button.disabled = true;
+        status.textContent = "Refresh requires make serve.";
+        return;
+      }
+
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        status.textContent = "Refreshing reports...";
+
+        try {
+          const response = await fetch("/refresh", {
+            method: "POST",
+            headers: {"X-Org-Timeviz-Refresh": "1"},
+            cache: "no-store",
+          });
+          if (!response.ok) {
+            throw new Error(`server returned HTTP ${response.status}`);
+          }
+          window.location.reload();
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          status.textContent = `Refresh failed: ${message}`;
+          button.disabled = false;
+        }
+      });
+    })();
+  </script>
+"""
+
+
 def write_index_html(out_root: Path, assets_dir: Path) -> Path:
     """Write outputs/index.html and leaf gallery pages for current artifacts."""
     out_root.mkdir(parents=True, exist_ok=True)
@@ -382,6 +425,10 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
     .links { margin-top: 6px; }
     .featured-gallery { margin-bottom: 28px; }
     .gallery-item { margin: 0 0 28px 0; }
+    .refresh-controls { display: flex; align-items: center; gap: 12px; margin: 0 0 20px 0; }
+    .refresh-controls button { padding: 8px 14px; cursor: pointer; }
+    .refresh-controls button:disabled { cursor: default; opacity: 0.6; }
+    #refresh-status { color: #555; }
     .outputs-section { margin-top: 40px; }
     .tree { list-style: none; padding-left: 0; margin: 0; }
     .tree ul { list-style: none; margin: 4px 0 0 0; }
@@ -395,6 +442,8 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
 <body>
   %s
 
+  %s
+
   <section class="outputs-section">
     <h1>org-timeviz outputs</h1>
     <ul class="tree">
@@ -404,6 +453,7 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
 </body>
 </html>
 """ % (
+        _refresh_controls_html(),
         _front_matter_section(
             featured_items,
             asset_prefix,

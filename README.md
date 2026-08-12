@@ -9,7 +9,47 @@ source of truth.
 * Parses `CLOCK` lines and associates them with headline path and inherited tags
 * Applies time periods and filters from YAML config
 * Resolves configured time-bucket allocations from tags
-* Generates plots and a `summary.json` per report
+* Generates static plots, an interactive time-bucket dashboard, an HTML index,
+  and JSON summaries for static reports
+
+## Running and refreshing reports
+
+The recommended workflow is:
+
+```bash
+make serve
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8000/
+```
+
+`make serve` first generates the reports, then starts a local HTTP server bound
+only to `127.0.0.1`. The generated `index.html` has a **Refresh reports** button
+at the top. Clicking it regenerates all report artifacts using the same config
+and reloads the page when generation finishes. Static files are served with
+caching disabled so regenerated plots are fetched immediately.
+
+Use a different port when needed:
+
+```bash
+make serve SERVE_PORT=8080
+```
+
+Stop the server with `Ctrl-C`.
+
+The old manual workflow still works:
+
+```bash
+make run
+firefox outputs/index.html
+```
+
+When `index.html` is opened directly through `file://`, the refresh button is
+disabled because browsers cannot invoke the local report generator from a file
+URL. In that mode, run `make run` again whenever the reports need updating.
 
 ## Other catalogue
 
@@ -32,74 +72,53 @@ If a record has no tags at all, it is reported under `(no-tag)`.
 
 ## Configuration
 
-The config file is a single YAML (default: `configs/default.yaml`). Reports are
-a fixed set (weekly/monthly "last", plus all weeks and all months in the data
-range, plus one timeseries and one monthly time-bucket trend report). The
-`reports:` section only configures shared filters and plot settings; it does
-not list report names.
+The config file is a single YAML (default: `configs/default.yaml`). Report types
+are fixed in code: a rolling 30-day task calendar, calendar-month task views, a
+daily working-hours timeseries, a monthly time-bucket trend, and the interactive
+time-bucket dashboard. The `reports:` section only configures shared filters and
+plot settings; it does not list report names.
 
 * `app.output_dir`: output directory (default `outputs/`)
 * `app.log_level`: logging level (e.g. `INFO`)
-* `parser.emacs_executable`: Emacs binary to invoke (default `emacs`)
 * `org_sources`: where to get Org files (either from `org-agenda-files` in an
-  init file, or an explicit list)
+  Emacs init file, or an explicit list)
 * `reports.filters`: include/exclude tags and task regex filters applied to all
   reports
 * `reports.plots`:
-  * `top_k_tasks`: top-K tasks used by the calendar view legend
-  * `top_k_tags`: top-K time buckets plus one extra "(others)" bin
+  * `top_k_tasks`: top-K tasks used by the task calendar legend
   * `timeseries_last_n_days`: if null, use all time; otherwise last N days
-  * `timeseries_rolling_days`: rolling mean window for the timeseries
 * `time_buckets`:
   * `other_bucket`: fallback bucket when no time-bucket tag matches
   * `bucket_order`: canonical time-bucket names and display/order priority
   * `tag_to_bucket`: mapping from raw Org tags to canonical time buckets
   * `resolution`: arbitration logic for tasks matching multiple time buckets
 
-TODO status keywords are obtained robustly via the Emacs batch step (from the
-init file used for agenda discovery), so task titles in plots exclude states
-like TODO/IN-PROGRESS/BLOCKED/etc.
+TODO status keywords are obtained robustly via the Emacs batch step, so task
+titles in plots exclude states like TODO/IN-PROGRESS/BLOCKED/etc.
 
 ## Outputs
 
-Artifacts are written under `outputs/assets/`, and `outputs/index.html` links to
-them. Each plot also has a matching JSON summary next to it.
-
-Naming follows this pattern:
-
-* `<visualization>__<content>__<period>__<range>`
-* for the latest rolling windows, the suffix becomes
-  `<visualization>__<content>__<period>__<range>__latest`
-
-Examples:
-* `histogram__time_bucket__month__YYYY-MM-DD_to_YYYY-MM-DD.png`
-* `histogram__time_bucket__month__YYYY-MM-DD_to_YYYY-MM-DD__latest.png`
-* `calendar_view__task__month__YYYY-MM-DD_to_YYYY-MM-DD.png`
-* `timeseries__daily_working_hours__day__all_time.png`
-* `timeseries__time_bucket__month__all_time.png`
+Artifacts are written under `outputs/assets/`, and `outputs/index.html` is the
+landing page. Static plots have matching JSON summaries next to them.
 
 Generated artifacts currently include:
 
-* Latest rolling windows:
-  * `histogram__time_bucket__week__YYYY-MM-DD_to_YYYY-MM-DD__latest.png`
-    and matching summary JSON
-  * `histogram__time_bucket__month__YYYY-MM-DD_to_YYYY-MM-DD__latest.png`
-    and matching summary JSON
-  * `calendar_view__task__month__YYYY-MM-DD_to_YYYY-MM-DD__latest.png`
-    and matching summary JSON
-  * `calendar_view__time_bucket__month__YYYY-MM-DD_to_YYYY-MM-DD__latest.png`
-    and matching summary JSON
+* `interactive__time_bucket.html`: linked interactive calendar and time-bucket
+  histogram. The histogram follows the calendar's visible date range.
+* `calendar_view__task__month__YYYY-MM-DD_to_YYYY-MM-DD__latest.png`: rolling
+  30-day task calendar and matching summary JSON.
+* `calendar_view__task__month__YYYY-MM-DD_to_YYYY-MM-DD.png`: one task calendar
+  per calendar month and matching summary JSON.
+* `timeseries__daily_working_hours__day__all_time.png`: daily working-hours
+  timeseries and matching summary JSON. If `timeseries_last_n_days` is set, the
+  filename contains that rolling date range instead of `all_time`.
+* `timeseries__time_bucket__month__all_time.png`: monthly time-bucket trend and
+  matching summary JSON.
 
-* Full-range windows:
-  * `histogram__time_bucket__week__YYYY-MM-DD_to_YYYY-MM-DD.png`
-  * `histogram__time_bucket__month__YYYY-MM-DD_to_YYYY-MM-DD.png`
-  * `calendar_view__task__month__YYYY-MM-DD_to_YYYY-MM-DD.png`
-  * `calendar_view__time_bucket__month__YYYY-MM-DD_to_YYYY-MM-DD.png`
-
-For `calendar_view__time_bucket__...`, each clocked block is colored by its
-dominant resolved time bucket after arbitration. When arbitration splits a task
-across multiple buckets, the bucket with the largest resolved share is used for
-calendar coloring.
+In the interactive calendar, each clocked block is colored by its dominant
+resolved time bucket after arbitration. If arbitration splits a task across
+multiple buckets, the largest resolved share determines the calendar color,
+while the linked histogram uses the full allocation fractions.
 
 ## Time buckets from tags
 

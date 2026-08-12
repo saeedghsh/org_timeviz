@@ -12,6 +12,7 @@ ENV_FILE ?= environment.yaml
 ENV_NAME ?= $(shell awk -F: '/^name:/{gsub(/^[ \t]+/, "", $$2); print $$2; exit}' $(ENV_FILE))
 
 CONDA ?= conda
+SERVE_PORT ?= 8000
 
 RUN_IN_CONDA_ENV = $(CONDA) run -n $(ENV_NAME) --no-capture-output
 
@@ -24,6 +25,10 @@ ensure-env: ## Ensure the conda env exists (create it if missing).
 .PHONY: run
 run: ensure-env ## Generate reports inside the repo conda env.
 	@$(RUN_IN_CONDA_ENV) python -m org_timeviz
+
+.PHONY: serve
+serve: ensure-env ## Generate and serve reports with browser refresh support.
+	@$(RUN_IN_CONDA_ENV) python -m org_timeviz.server --port $(SERVE_PORT)
 
 .PHONY: other_catalogue
 other_catalogue: ensure-env ## Write CSV of unmapped tags contributing to the other time bucket.
