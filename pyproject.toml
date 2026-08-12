@@ -18,16 +18,21 @@ org-timeviz = "org_timeviz.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-v --cov=. --cov-report=term-missing"
+pythonpath = ["."]
+addopts = "-v --cov=org_timeviz --cov-report=term-missing"
 python_files = ["test_*.py"]
 filterwarnings = [
     "ignore::DeprecationWarning",
-    "ignore::duckdb_engine.DuckDBEngineWarning",
 ]
 
 
 [tool.coverage.run]
-omit = ["*/tests/*", "*/config-3.py", "*/config.py"]
+branch = true
+source = ["org_timeviz"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 90
 
 [tool.pylint]
 init-hook = "import os, sys; sys.path.append(os.getcwd())"
