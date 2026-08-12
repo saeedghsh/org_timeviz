@@ -171,19 +171,12 @@ def _front_matter_section(
     if include_interactive_time_bucket:
         body_parts.append(_wrap_interactive_time_bucket(asset_prefix))
 
-    body_parts.extend(
-        _wrap_gallery_item(item, asset_prefix=asset_prefix) for item in items
-    )
+    body_parts.extend(_wrap_gallery_item(item, asset_prefix=asset_prefix) for item in items)
     if not body_parts:
         return ""
 
     body = "\n".join(body_parts)
-    return (
-        '<section class="featured-gallery">\n'
-        "  <h1>Featured plots</h1>\n"
-        f"{body}\n"
-        "</section>\n"
-    )
+    return f'<section class="featured-gallery">\n  <h1>Featured plots</h1>\n{body}\n</section>\n'
 
 
 def _gallery_page_html(
@@ -251,12 +244,7 @@ def _tree_period_node(
 ) -> str:
     period_esc = html.escape(period)
     page_href = html.escape(page_name)
-    return (
-        "<li>"
-        f'<a href="{page_href}">{period_esc}</a> '
-        f'<span class="count">({count})</span>'
-        "</li>"
-    )
+    return f'<li><a href="{page_href}">{period_esc}</a> <span class="count">({count})</span></li>'
 
 
 def _tree_content_node(
@@ -294,9 +282,7 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
 
     pngs = _discover_pngs(assets_dir)
     asset_prefix = assets_dir.name
-    interactive_time_bucket_exists = (
-        assets_dir / INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME
-    ).exists()
+    interactive_time_bucket_exists = (assets_dir / INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME).exists()
 
     items_by_png = {
         png_name: _PlotItem(
@@ -378,7 +364,7 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
             asset_prefix=asset_prefix,
         )
         visualization_nodes.append(
-            '<li><a href="other.html">other</a> ' f'<span class="count">({len(other)})</span></li>'
+            f'<li><a href="other.html">other</a> <span class="count">({len(other)})</span></li>'
         )
 
     html_text = """\

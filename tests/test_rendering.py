@@ -43,9 +43,7 @@ def test_calendar_slices_split_at_midnight() -> None:
 
 
 def test_task_calendar_writes_png(tmp_path: Path) -> None:
-    record = make_clipped(
-        make_record(start=datetime(2026, 1, 1, 9), end=datetime(2026, 1, 1, 10))
-    )
+    record = make_clipped(make_record(start=datetime(2026, 1, 1, 9), end=datetime(2026, 1, 1, 10)))
     path = tmp_path / "calendar.png"
     plot_calendar_view_by_task([record], path, title="Calendar", top_k_tasks=5)
     assert path.exists() and path.stat().st_size > 0
@@ -87,7 +85,9 @@ def test_monthly_time_bucket_outputs(tmp_path: Path, bucket_cfg: TimeBucketsConf
     assert payload["percent_by_bucket"]["work"]["2026-01-01"] == pytest.approx(100.0)
 
 
-def test_interactive_preparation_preserves_task_and_dominant_bucket(bucket_cfg: TimeBucketsConfig) -> None:
+def test_interactive_preparation_preserves_task_and_dominant_bucket(
+    bucket_cfg: TimeBucketsConfig,
+) -> None:
     record = make_clipped(
         make_record(
             start=datetime(2026, 1, 1, 9),
@@ -113,7 +113,9 @@ def test_interactive_calendar_splits_midnight(bucket_cfg: TimeBucketsConfig) -> 
     assert [item.minutes for item in slices] == [15, 15]
 
 
-def test_bucket_hours_clip_to_visible_interval_and_keep_fixed_order(bucket_cfg: TimeBucketsConfig) -> None:
+def test_bucket_hours_clip_to_visible_interval_and_keep_fixed_order(
+    bucket_cfg: TimeBucketsConfig,
+) -> None:
     records = [
         make_clipped(
             make_record(
@@ -149,7 +151,9 @@ def test_interactive_helpers_are_stable(bucket_cfg: TimeBucketsConfig) -> None:
     assert _script_safe_json('{"x":"</script>"}') == '{"x":"<\\/script>"}'
 
 
-def test_interactive_dashboard_contains_task_and_linking_script(tmp_path: Path, bucket_cfg: TimeBucketsConfig) -> None:
+def test_interactive_dashboard_contains_task_and_linking_script(
+    tmp_path: Path, bucket_cfg: TimeBucketsConfig
+) -> None:
     record = make_clipped(
         make_record(
             start=datetime(2026, 1, 1, 9),
@@ -220,7 +224,9 @@ def test_index_ignores_deprecated_pngs_and_embeds_interactive_dashboard(tmp_path
     assert "histogram__time_bucket__month__old.png" not in text
 
 
-def test_empty_monthly_and_timeseries_plots_are_still_valid_files(tmp_path: Path, bucket_cfg: TimeBucketsConfig) -> None:
+def test_empty_monthly_and_timeseries_plots_are_still_valid_files(
+    tmp_path: Path, bucket_cfg: TimeBucketsConfig
+) -> None:
     monthly = compute_monthly_time_buckets([], bucket_cfg)
     monthly_png = tmp_path / "empty-monthly.png"
     plot_monthly_time_buckets(monthly, monthly_png)

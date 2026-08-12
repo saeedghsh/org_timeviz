@@ -44,7 +44,9 @@ def make_record(
     )
 
 
-def make_clipped(record: ClockRecord, *, start: datetime | None = None, end: datetime | None = None) -> ClippedRecord:
+def make_clipped(
+    record: ClockRecord, *, start: datetime | None = None, end: datetime | None = None
+) -> ClippedRecord:
     clipped_start = start or record.start
     clipped_end = end or record.end
     minutes = int((clipped_end - clipped_start).total_seconds() // 60)

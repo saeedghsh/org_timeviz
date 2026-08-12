@@ -71,10 +71,17 @@ def test_other_catalogue_csv_format(tmp_path: Path) -> None:
         assert list(csv.reader(handle)) == [["tag", "hours"], ["x", "1.23"]]
 
 
-def test_generate_other_catalogue_writes_header_for_no_records(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_generate_other_catalogue_writes_header_for_no_records(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     cfg = _cfg(tmp_path)
-    monkeypatch.setattr("org_timeviz.other_catalogue.resolve_org_inputs", lambda cfg: type("I", (), {"org_files": [], "agenda_init_path": None})())
+    monkeypatch.setattr(
+        "org_timeviz.other_catalogue.resolve_org_inputs",
+        lambda cfg: type("I", (), {"org_files": [], "agenda_init_path": None})(),
+    )
     monkeypatch.setattr("org_timeviz.other_catalogue.configure_emacs_init", lambda *args: None)
-    monkeypatch.setattr("org_timeviz.other_catalogue.parse_org_clock_records_emacs", lambda **kwargs: [])
+    monkeypatch.setattr(
+        "org_timeviz.other_catalogue.parse_org_clock_records_emacs", lambda **kwargs: []
+    )
     path = generate_other_catalogue(cfg)
     assert path.read_text(encoding="utf-8") == "tag,hours\n"

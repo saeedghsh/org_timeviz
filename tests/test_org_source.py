@@ -37,13 +37,13 @@ def _app_config(**org_source_overrides: object) -> AppConfig:
 def test_read_agenda_files_handles_comments_and_strings(tmp_path: Path) -> None:
     init = tmp_path / "init.el"
     init.write_text(
-        '''
+        """
 ;; org-agenda-files in a comment must not count
 (setq org-agenda-files
       '("~/one.org"
         ;; "ignored.org"
         "~/two.org"))
-''',
+""",
         encoding="utf-8",
     )
     result = read_agenda_files_from_emacs_init(init, "org-agenda-files")
@@ -55,7 +55,7 @@ def test_read_agenda_files_handles_comments_and_strings(tmp_path: Path) -> None:
 def test_read_agenda_files_returns_none_for_missing_or_absent(tmp_path: Path) -> None:
     assert read_agenda_files_from_emacs_init(tmp_path / "missing.el", "org-agenda-files") is None
     init = tmp_path / "init.el"
-    init.write_text("(setq something-else '(\"x\"))", encoding="utf-8")
+    init.write_text('(setq something-else \'("x"))', encoding="utf-8")
     assert read_agenda_files_from_emacs_init(init, "org-agenda-files") is None
 
 
@@ -86,7 +86,9 @@ def test_resolve_emacs_inputs_raises_if_not_found(tmp_path: Path) -> None:
         resolve_org_inputs(cfg)
 
 
-def test_configure_emacs_init_sets_and_clears_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_configure_emacs_init_sets_and_clears_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     init = tmp_path / "init.el"
     init.write_text("", encoding="utf-8")
     cfg = _app_config(emacs_init_paths=[str(init)])
@@ -100,7 +102,9 @@ def test_configure_emacs_init_sets_and_clears_environment(tmp_path: Path, monkey
     assert "ORG_TIMEVIZ_EMACS_INIT" not in __import__("os").environ
 
 
-def test_emacs_batch_parser_builds_clock_records(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_emacs_batch_parser_builds_clock_records(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     org_file = tmp_path / "work.org"
     org_file.write_text("* Task", encoding="utf-8")
     payload = {
@@ -128,7 +132,9 @@ def test_emacs_batch_parser_returns_empty_for_missing_files(tmp_path: Path) -> N
     assert parse_org_clock_records_emacs([tmp_path / "missing.org"]) == []
 
 
-def test_emacs_batch_parser_surfaces_process_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_emacs_batch_parser_surfaces_process_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     org_file = tmp_path / "work.org"
     org_file.write_text("* Task", encoding="utf-8")
     monkeypatch.setattr(

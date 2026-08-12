@@ -49,6 +49,7 @@ class _BaseConfig(BaseModel):
 
     model_config = {"extra": "forbid"}
 
+
 class AppSettings(_BaseConfig):
     """Hold global application settings."""
 

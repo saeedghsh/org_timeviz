@@ -25,7 +25,6 @@ def window_last_n_days(now: datetime, n: int) -> TimeWindow:
     return TimeWindow(name=f"last_{n}_days", start=start, end=end)
 
 
-
 def month_start(dt: datetime) -> datetime:
     """Return the first day (00:00) of dt's month."""
     day0 = at_midnight(dt)
@@ -37,7 +36,6 @@ def next_month_start(dt: datetime) -> datetime:
     if dt.month == 12:
         return datetime(dt.year + 1, 1, 1)
     return datetime(dt.year, dt.month + 1, 1)
-
 
 
 def iter_month_windows(min_dt: datetime, max_dt: datetime) -> list[TimeWindow]:

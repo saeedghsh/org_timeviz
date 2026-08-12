@@ -33,7 +33,9 @@ def test_cli_parse_args_defaults_to_default_config() -> None:
     assert cli._parse_args([]).config == Path("configs/default.yaml")
 
 
-def test_cli_main_loads_config_and_generates_reports(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cli_main_loads_config_and_generates_reports(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     path = tmp_path / "config.yaml"
     path.write_text(
         """
@@ -54,7 +56,9 @@ time_buckets:
     assert len(seen) == 1
 
 
-def test_generate_all_reports_returns_early_without_records(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_generate_all_reports_returns_early_without_records(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     cfg = _cfg(tmp_path)
     monkeypatch.setattr(
         reports,
@@ -67,7 +71,9 @@ def test_generate_all_reports_returns_early_without_records(tmp_path: Path, monk
     assert not (tmp_path / "assets").exists()
 
 
-def test_generate_all_reports_orchestrates_all_current_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_generate_all_reports_orchestrates_all_current_outputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     cfg = _cfg(tmp_path)
     cfg.reports.plots.timeseries_last_n_days = 14
     records = [
@@ -114,11 +120,15 @@ def test_generate_all_reports_orchestrates_all_current_outputs(tmp_path: Path, m
         lambda records, out_path, **kwargs: calls.append(("interactive", out_path)),
     )
     monkeypatch.setattr(reports, "write_summary_json", lambda aggs, out_path: None)
-    monkeypatch.setattr(reports, "write_monthly_time_buckets_summary_json", lambda report, out_path: None)
+    monkeypatch.setattr(
+        reports, "write_monthly_time_buckets_summary_json", lambda report, out_path: None
+    )
     monkeypatch.setattr(
         reports,
         "write_index_html",
-        lambda out_root, assets_dir: calls.append(("index", out_root / "index.html")) or out_root / "index.html",
+        lambda out_root, assets_dir: (
+            calls.append(("index", out_root / "index.html")) or out_root / "index.html"
+        ),
     )
 
     reports.generate_all_reports(cfg)
