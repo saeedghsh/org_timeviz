@@ -12,9 +12,6 @@ from matplotlib.figure import Figure
 from .aggregate import Aggregates
 
 FIGSIZE: Final[tuple[float, float]] = (20.0, 12.0)
-FIGSIZE_TASK: Final[tuple[float, float]] = (20.0, 12.0)
-OTHERS_LABEL: Final[str] = "(others)"
-
 TIMESERIES_MAIN_COLOR: Final[str] = "tab:blue"
 TIMESERIES_ALL_TIME_COLOR: Final[str] = "orange"
 TIMESERIES_WEEKLY_COLOR: Final[str] = "green"
@@ -25,18 +22,6 @@ TIMESERIES_MONTHLY_WINDOW_DAYS: Final[int] = 30
 
 def _minutes_to_hours(minutes: float) -> float:
     return float(minutes) / 60.0
-
-
-def _top_k_with_others(items: dict[str, float], k: int) -> list[tuple[str, float]]:
-    pairs = sorted(items.items(), key=lambda kv: kv[1], reverse=True)
-    if len(pairs) <= k:
-        return pairs
-
-    top = pairs[:k]
-    rest_sum = sum(value for _, value in pairs[k:])
-    if rest_sum > 0:
-        top.append((OTHERS_LABEL, rest_sum))
-    return top
 
 
 def _top_k(items: dict[str, float], k: int) -> list[tuple[str, float]]:
@@ -92,29 +77,8 @@ def _rolling_workday_average(
     return out
 
 
-def plot_bar_by_task(aggs: Aggregates, out_path: Path, top_k: int) -> None:
-    """Plot a bar chart of total hours per task (outline path)."""
-    task_minutes = {label: float(value) for label, value in aggs.minutes_by_task.items()}
-    pairs = _top_k_with_others(task_minutes, top_k)
-    labels = [pair[0] for pair in pairs]
-    values = [_minutes_to_hours(pair[1]) for pair in pairs]
-
-    fig, ax = plt.subplots(figsize=FIGSIZE_TASK)
-    ax.bar(labels, values)
-
-    # Labels can get long on weekly plots; rotate + tight bbox avoids cropping.
-    _set_xtick_style(ax, rotation=90)
-
-    ax.set_ylabel("Hours")
-    ax.set_title("Total hours by task (outline path)")
-
-    _finalize_figure(fig, out_path)
-
-
-def plot_timeseries_daily_total(aggs: Aggregates, out_path: Path, rolling_days: int) -> None:
+def plot_timeseries_daily_total(aggs: Aggregates, out_path: Path) -> None:
     """Plot daily total hours with workday-normalized averages."""
-    del rolling_days
-
     logged_days = sorted(aggs.minutes_by_day.keys())
     fig, ax = plt.subplots(figsize=FIGSIZE)
 

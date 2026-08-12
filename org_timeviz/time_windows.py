@@ -25,11 +25,6 @@ def window_last_n_days(now: datetime, n: int) -> TimeWindow:
     return TimeWindow(name=f"last_{n}_days", start=start, end=end)
 
 
-def week_start_monday(dt: datetime) -> datetime:
-    """Return the Monday (00:00) for the week containing dt."""
-    day0 = at_midnight(dt)
-    return day0 - timedelta(days=day0.weekday())
-
 
 def month_start(dt: datetime) -> datetime:
     """Return the first day (00:00) of dt's month."""
@@ -43,18 +38,6 @@ def next_month_start(dt: datetime) -> datetime:
         return datetime(dt.year + 1, 1, 1)
     return datetime(dt.year, dt.month + 1, 1)
 
-
-def iter_week_windows(min_dt: datetime, max_dt: datetime) -> list[TimeWindow]:
-    """Return Monday-to-Monday windows covering [min_dt, max_dt]."""
-    start = week_start_monday(min_dt)
-    end = week_start_monday(max_dt) + timedelta(days=7)
-
-    windows: list[TimeWindow] = []
-    cur = start
-    while cur < end:
-        windows.append(TimeWindow(name="week", start=cur, end=cur + timedelta(days=7)))
-        cur = cur + timedelta(days=7)
-    return windows
 
 
 def iter_month_windows(min_dt: datetime, max_dt: datetime) -> list[TimeWindow]:

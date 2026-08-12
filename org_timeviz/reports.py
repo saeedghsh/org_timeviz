@@ -132,13 +132,11 @@ def _write_timeseries_report(
     aggs: Aggregates,
     assets_root: Path,
     stem: str,
-    rolling_days: int,
 ) -> None:
     """Write the daily-total timeseries plot and its summary."""
     plot_timeseries_daily_total(
         aggs,
         assets_root / f"{stem}.png",
-        rolling_days=rolling_days,
     )
     write_summary_json(aggs, assets_root / f"{stem}__summary.json")
 
@@ -222,7 +220,6 @@ def generate_all_reports(cfg: AppConfig) -> None:
         _build_aggs_from_filtered(cfg, ts_records),
         assets_root,
         f"timeseries__daily_working_hours__day__{ts_label}",
-        rolling_days=cfg.reports.plots.timeseries_rolling_days,
     )
 
     all_time_window = TimeWindow(

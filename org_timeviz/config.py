@@ -1,7 +1,7 @@
 """Define and validate YAML configuration for report generation."""
 
 from pathlib import Path
-from typing import Any, Literal, Self
+from typing import Literal, Self
 
 import yaml
 from pydantic import BaseModel, Field, model_validator
@@ -49,19 +49,6 @@ class _BaseConfig(BaseModel):
 
     model_config = {"extra": "forbid"}
 
-    @classmethod
-    def validate_model(cls, data: Any) -> "_BaseConfig":
-        """Validate data into the model."""
-        return cls.model_validate(data)
-
-    @classmethod
-    def from_yaml(cls, path: Path) -> "_BaseConfig":
-        """Load YAML file and validate."""
-        with path.open("r", encoding="utf-8") as file_handle:
-            raw = yaml.safe_load(file_handle) or {}
-        return cls.validate_model(raw)
-
-
 class AppSettings(_BaseConfig):
     """Hold global application settings."""
 
@@ -93,12 +80,9 @@ class PlotsConfig(_BaseConfig):
     """Hold plot settings shared by all generated reports."""
 
     top_k_tasks: int = Field(default=25, ge=1)
-    top_k_tags: int = Field(default=25, ge=1)
 
     # If null, timeseries spans the full data range.
     timeseries_last_n_days: int | None = Field(default=None)
-
-    timeseries_rolling_days: int = Field(default=7, ge=1)
 
 
 class TimeBucketRuleConfig(_BaseConfig):
@@ -247,4 +231,4 @@ class AppConfig(_BaseConfig):
         """Load, parse, and validate configuration from YAML."""
         with path.open("r", encoding="utf-8") as file_handle:
             raw = yaml.safe_load(file_handle) or {}
-        return cls.validate_model(raw)  # type: ignore[return-value]
+        return cls.model_validate(raw)

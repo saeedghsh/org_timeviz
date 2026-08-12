@@ -20,10 +20,8 @@ reports:
     exclude_task_regex: []
   plots:
     top_k_tasks: 25
-    top_k_tags: 25
     # If null, timeseries spans the full data range.
     timeseries_last_n_days: null
-    timeseries_rolling_days: 7
 
 time_buckets:
   other_bucket: other

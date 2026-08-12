@@ -132,32 +132,3 @@ def _extract_double_quoted_strings(block: str) -> list[str]:
         i += 1
 
     return strings
-
-
-def read_todo_keywords_from_emacs_init(init_path: Path) -> list[str] | None:
-    """Extract Org TODO keywords from an Emacs init file, if present."""
-    if not init_path.exists():
-        return None
-
-    text = init_path.read_text(encoding="utf-8")
-
-    block = _find_setq_block(text, var_name="org-todo-keywords")
-    if block is None:
-        return None
-
-    kws = _extract_double_quoted_strings(block)
-    if not kws:
-        return None
-
-    # Remove separators and de-duplicate while preserving order.
-    seen: set[str] = set()
-    out: list[str] = []
-    for k in kws:
-        k = k.strip()
-        if not k or k == "|":
-            continue
-        if k not in seen:
-            out.append(k)
-            seen.add(k)
-
-    return out or None
