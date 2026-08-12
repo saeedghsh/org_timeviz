@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 
 from org_timeviz.config import TimeBucketsConfig
-from org_timeviz.rendering.calendar import build_calendar_slices, plot_calendar_view_by_task
 from org_timeviz.rendering.index import write_index_html
 from org_timeviz.rendering.interactive_time_bucket import (
     _bucket_hours_for_interval,
@@ -25,28 +24,6 @@ from org_timeviz.rendering.plots import plot_timeseries_daily_total, write_summa
 from org_timeviz.aggregate import compute_aggregates
 
 from conftest import make_clipped, make_record
-
-
-def test_calendar_slices_split_at_midnight() -> None:
-    record = make_clipped(
-        make_record(
-            start=datetime(2026, 1, 1, 23, 30),
-            end=datetime(2026, 1, 2, 0, 30),
-            outline_path="Project / Task",
-        )
-    )
-    slices = build_calendar_slices([record], lambda item: item.record.outline_path)
-    assert [(item.day, item.start_minute, item.end_minute) for item in slices] == [
-        (date(2026, 1, 1), 23 * 60 + 30, 24 * 60),
-        (date(2026, 1, 2), 0, 30),
-    ]
-
-
-def test_task_calendar_writes_png(tmp_path: Path) -> None:
-    record = make_clipped(make_record(start=datetime(2026, 1, 1, 9), end=datetime(2026, 1, 1, 10)))
-    path = tmp_path / "calendar.png"
-    plot_calendar_view_by_task([record], path, title="Calendar", top_k_tasks=5)
-    assert path.exists() and path.stat().st_size > 0
 
 
 def test_monthly_time_buckets_split_record_across_months(bucket_cfg: TimeBucketsConfig) -> None:
@@ -222,6 +199,7 @@ def test_index_ignores_deprecated_pngs_and_embeds_interactive_dashboard(tmp_path
     assert current in text
     assert "calendar_view__time_bucket__month__old.png" not in text
     assert "histogram__time_bucket__month__old.png" not in text
+    assert 'class="outputs-section"' not in text
 
 
 def test_empty_monthly_and_timeseries_plots_are_still_valid_files(

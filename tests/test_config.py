@@ -36,7 +36,7 @@ time_buckets:
     )
     cfg = AppConfig.from_yaml(path)
     assert cfg.app.output_dir == "outputs"
-    assert cfg.reports.plots.top_k_tasks == 25
+    assert cfg.reports.plots.timeseries_last_n_days is None
     assert cfg.time_buckets.tag_to_bucket == {"job": "work"}
 
 

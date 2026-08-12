@@ -15,7 +15,7 @@ def _cfg(tmp_path: Path) -> AppConfig:
         {
             "app": {"output_dir": str(tmp_path)},
             "org_sources": {"mode": "explicit", "explicit_files": []},
-            "reports": {"plots": {"top_k_tasks": 5, "timeseries_last_n_days": None}},
+            "reports": {"plots": {"timeseries_last_n_days": None}},
             "time_buckets": {
                 "other_bucket": "other",
                 "bucket_order": ["work", "other"],
@@ -101,11 +101,6 @@ def test_generate_all_reports_orchestrates_all_current_outputs(
     monkeypatch.setattr(reports, "parse_org_clock_records_emacs", lambda **kwargs: records)
     monkeypatch.setattr(
         reports,
-        "plot_calendar_view_by_task",
-        lambda records, out_path, **kwargs: calls.append(("calendar", out_path)),
-    )
-    monkeypatch.setattr(
-        reports,
         "plot_timeseries_daily_total",
         lambda aggs, out_path: calls.append(("timeseries", out_path)),
     )
@@ -134,7 +129,7 @@ def test_generate_all_reports_orchestrates_all_current_outputs(
     reports.generate_all_reports(cfg)
 
     kinds = [kind for kind, _ in calls]
-    assert kinds.count("calendar") == 3  # latest rolling view + Jan/Feb calendar months
+    assert "calendar" not in kinds
     assert kinds.count("timeseries") == 1
     assert kinds.count("monthly_buckets") == 1
     assert kinds.count("interactive") == 1

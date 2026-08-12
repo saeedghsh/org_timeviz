@@ -10,7 +10,6 @@ from .filters import ClippedRecord, apply_filters, clip_to_window
 from .models import ClockRecord
 from .org_source.emacs import parse_org_clock_records_emacs
 from .org_source.inputs import configure_emacs_init, resolve_org_inputs
-from .rendering.calendar import plot_calendar_view_by_task
 from .rendering.index import INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME, write_index_html
 from .rendering.interactive_time_bucket import write_interactive_time_bucket_dashboard
 from .rendering.monthly_time_buckets import (
@@ -22,7 +21,6 @@ from .rendering.plots import plot_timeseries_daily_total, write_summary_json
 from .time_windows import (
     TimeWindow,
     at_midnight,
-    iter_month_windows,
     label_range,
     window_last_n_days,
 )
@@ -49,27 +47,6 @@ def _build_filtered_records(
 def _build_aggs_from_filtered(cfg: AppConfig, records: list[ClippedRecord]) -> Aggregates:
     """Compute aggregates from already-filtered clipped records."""
     return compute_aggregates(records, cfg.time_buckets)
-
-
-def _write_task_calendar_report(
-    filtered_records: list[ClippedRecord],
-    aggs: Aggregates,
-    assets_root: Path,
-    *,
-    period: str,
-    label: str,
-    top_k_tasks: int,
-) -> None:
-    """Write the task calendar-view plot and its summary."""
-    stem = f"calendar_view__task__{period}__{label}"
-    title = f"Calendar view by task ({period}: {label})"
-    plot_calendar_view_by_task(
-        filtered_records,
-        assets_root / f"{stem}.png",
-        title=title,
-        top_k_tasks=top_k_tasks,
-    )
-    write_summary_json(aggs, assets_root / f"{stem}__summary.json")
 
 
 def _write_timeseries_report(
@@ -118,30 +95,6 @@ def generate_all_reports(cfg: AppConfig) -> None:
 
     min_dt = min(record.start for record in records)
     max_dt = max(record.end for record in records)
-
-    top_k_tasks = cfg.reports.plots.top_k_tasks
-
-    latest_task_window = window_last_n_days(now, 30)
-    latest_task_records = _build_filtered_records(cfg, records, latest_task_window)
-    _write_task_calendar_report(
-        latest_task_records,
-        _build_aggs_from_filtered(cfg, latest_task_records),
-        assets_root,
-        period="month",
-        label=_latest_label(latest_task_window),
-        top_k_tasks=top_k_tasks,
-    )
-
-    for window in iter_month_windows(min_dt, max_dt):
-        filtered_records = _build_filtered_records(cfg, records, window)
-        _write_task_calendar_report(
-            filtered_records,
-            _build_aggs_from_filtered(cfg, filtered_records),
-            assets_root,
-            period="month",
-            label=label_range(window),
-            top_k_tasks=top_k_tasks,
-        )
 
     if cfg.reports.plots.timeseries_last_n_days is None:
         ts_window = TimeWindow(

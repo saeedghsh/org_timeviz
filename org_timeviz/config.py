@@ -80,8 +80,6 @@ class FiltersConfig(_BaseConfig):
 class PlotsConfig(_BaseConfig):
     """Hold plot settings shared by all generated reports."""
 
-    top_k_tasks: int = Field(default=25, ge=1)
-
     # If null, timeseries spans the full data range.
     timeseries_last_n_days: int | None = Field(default=None)
 

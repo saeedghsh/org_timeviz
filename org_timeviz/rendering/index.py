@@ -9,6 +9,7 @@ from typing import Iterable
 INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME = "interactive__time_bucket.html"
 
 DEPRECATED_PNG_PREFIXES = (
+    "calendar_view__task__",
     "calendar_view__time_bucket__",
     "histogram__time_bucket__",
 )
@@ -568,14 +569,6 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
     .clock-report-heading input { margin-left: 6px; }
     .clock-report pre { overflow-x: auto; margin: 8px 0 0 0; padding: 12px; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; }
     .clock-report code { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
-    .outputs-section { margin-top: 40px; }
-    .tree { list-style: none; padding-left: 0; margin: 0; }
-    .tree ul { list-style: none; margin: 4px 0 0 0; }
-    .level-1 { padding-left: 20px; }
-    .level-2 { padding-left: 20px; }
-    .node-label { font-weight: bold; }
-    .count { color: #555; }
-    .tree li { margin: 6px 0; }
   </style>
 </head>
 <body>
@@ -585,12 +578,6 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
 
   %s
 
-  <section class="outputs-section">
-    <h1>org-timeviz outputs</h1>
-    <ul class="tree">
-      %s
-    </ul>
-  </section>
 </body>
 </html>
 """ % (
@@ -601,7 +588,6 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
             asset_prefix,
             include_interactive_time_bucket=interactive_time_bucket_exists,
         ),
-        "\n".join(visualization_nodes),
     )
 
     index_path = out_root / "index.html"

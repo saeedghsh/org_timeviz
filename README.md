@@ -108,10 +108,9 @@ If a record has no tags at all, it is reported under `(no-tag)`.
 ## Configuration
 
 The config file is a single YAML (default: `configs/default.yaml`). Report types
-are fixed in code: a rolling 30-day task calendar, calendar-month task views, a
-daily working-hours timeseries, a monthly time-bucket trend, and the interactive
-time-bucket dashboard. The `reports:` section only configures shared filters and
-plot settings; it does not list report names.
+are fixed in code: a daily working-hours timeseries, a monthly time-bucket trend,
+and the interactive time-bucket dashboard. The `reports:` section only configures
+shared filters and plot settings; it does not list report names.
 
 * `app.output_dir`: output directory (default `outputs/`)
 * `app.log_level`: logging level (e.g. `INFO`)
@@ -120,7 +119,6 @@ plot settings; it does not list report names.
 * `reports.filters`: include/exclude tags and task regex filters applied to all
   reports
 * `reports.plots`:
-  * `top_k_tasks`: top-K tasks used by the task calendar legend
   * `timeseries_last_n_days`: if null, use all time; otherwise last N days
 * `time_buckets`:
   * `other_bucket`: fallback bucket when no time-bucket tag matches
@@ -140,10 +138,10 @@ Generated artifacts currently include:
 
 * `interactive__time_bucket.html`: linked interactive calendar and time-bucket
   histogram. The histogram follows the calendar's visible date range.
-* `calendar_view__task__month__YYYY-MM-DD_to_YYYY-MM-DD__latest.png`: rolling
-  30-day task calendar and matching summary JSON.
-* `calendar_view__task__month__YYYY-MM-DD_to_YYYY-MM-DD.png`: one task calendar
-  per calendar month and matching summary JSON.
+
+Static Matplotlib `calendar_view` PNGs are no longer generated; the interactive
+dashboard is the supported calendar view.
+
 * `timeseries__daily_working_hours__day__all_time.png`: daily working-hours
   timeseries and matching summary JSON. If `timeseries_last_n_days` is set, the
   filename contains that rolling date range instead of `all_time`.

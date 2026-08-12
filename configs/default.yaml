@@ -19,7 +19,6 @@ reports:
     include_task_regex: []
     exclude_task_regex: []
   plots:
-    top_k_tasks: 25
     # If null, timeseries spans the full data range.
     timeseries_last_n_days: null
 
