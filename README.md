@@ -40,7 +40,7 @@ plots with:
 
 * suspicious clocks across the agenda files: malformed lines, open clocks,
   declared-duration mismatches, and overlapping intervals
-* chronological clock entries for a selected day
+* chronological clock entries for a selected day, including gaps between entries
 * total logged time for an independently selected day
 * total logged time for the Monday-to-Sunday week containing a selected date
 

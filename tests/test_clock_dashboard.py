@@ -1,4 +1,5 @@
 import json
+import shutil
 from datetime import date
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -53,8 +54,8 @@ def _write_dashboard_init(path: Path) -> None:
                 "(defun my/org--collect-ts-pos (text) nil)",
                 "(defun my/org--ts->sec (timestamp) 0)",
                 "(defun my/org-clocklog-rows (&optional date files) nil)",
-                "(defun my/org-clocklog--fmt-hhmm (seconds) \"00:00\")",
-                "(defun my/org-clocklog--fmt-dur (minutes) \"0:00\")",
+                '(defun my/org-clocklog--fmt-hhmm (seconds) "00:00")',
+                '(defun my/org-clocklog--fmt-dur (minutes) "0:00")',
             ]
         ),
         encoding="utf-8",
@@ -111,6 +112,48 @@ def test_render_clock_dashboard_uses_configured_init_and_marked_json(tmp_path: P
         chronological="09:00 Task",
         day_total="1:30",
         week_total="8:15",
+    )
+
+
+@pytest.mark.skipif(shutil.which("emacs") is None, reason="Emacs is not installed")
+def test_render_clock_dashboard_includes_gaps_between_entries(tmp_path: Path) -> None:
+    init_path = tmp_path / "init-org.el"
+    init_path.write_text(
+        """
+(setq org-agenda-files nil)
+(defun my/org-clock-suspects (files) (ignore files) nil)
+(defun my/org--collect-ts-pos (text) (ignore text) nil)
+(defun my/org--ts->sec (timestamp) (ignore timestamp) 0)
+(defun my/org-clocklog-rows (&optional date files)
+  (ignore date files)
+  '((32400 36000 60 "First task")
+    (37800 39600 30 "Second task")
+    (39600 41400 30 "Third task")))
+(defun my/org-clocklog--fmt-hhmm (seconds)
+  (format "%02d:%02d" (/ seconds 3600) (/ (% seconds 3600) 60)))
+(defun my/org-clocklog--fmt-dur (minutes)
+  (let ((rounded (round minutes)))
+    (format "%d:%02d" (/ rounded 60) (% rounded 60))))
+""".strip(),
+        encoding="utf-8",
+    )
+    cfg = _app_config(tmp_path / "outputs", [init_path])
+
+    report = render_clock_dashboard(
+        cfg,
+        day=date(2026, 8, 5),
+        day_total_day=date(2026, 8, 5),
+        week_start=date(2026, 8, 3),
+    )
+
+    lines = report.chronological.splitlines()
+    gap_lines = [line for line in lines if line.startswith("| GAP")]
+    assert gap_lines == ["| GAP         | 10:00 | 10:30 | 0:30     |"]
+    assert (
+        lines.index(gap_lines[0]) == lines.index("| First task  | 09:00 | 10:00 | 1:00     |") + 1
+    )
+    assert lines.index("| Second task | 10:30 | 11:00 | 0:30     |") + 1 == lines.index(
+        "| Third task  | 11:00 | 11:30 | 0:30     |"
     )
 
 
@@ -236,5 +279,8 @@ def test_generated_index_contains_live_clock_dashboard(tmp_path: Path) -> None:
     assert 'id="clock-week-date" type="date"' in text
     assert 'id="refresh-clock-dashboard"' in text
     assert "day_total_date: dayTotalDateInput.value" in text
+    assert "renderChronological(payload.chronological)" in text
+    assert 'row.className = "clock-gap-row"' in text
+    assert ".clock-gap-row { color: #656d76; }" in text
     assert "/clock-dashboard?" in text
     assert "Clock dashboard requires make serve." in text

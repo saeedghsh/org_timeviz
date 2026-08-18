@@ -390,6 +390,22 @@ def _clock_dashboard_html() -> str:
         }
       }
 
+      function renderChronological(value) {
+        chronological.replaceChildren();
+        const lines = value.split("\\n");
+        for (const [index, line] of lines.entries()) {
+          const row = document.createElement("span");
+          if (/^[|] GAP +[|]/.test(line)) {
+            row.className = "clock-gap-row";
+          }
+          row.textContent = line;
+          chronological.append(row);
+          if (index < lines.length - 1) {
+            chronological.append(document.createTextNode("\\n"));
+          }
+        }
+      }
+
       async function loadClockDashboard() {
         setAll("Loading...");
         refreshButton.disabled = true;
@@ -407,7 +423,7 @@ def _clock_dashboard_html() -> str:
           }
           const payload = await response.json();
           suspects.textContent = payload.suspects;
-          chronological.textContent = payload.chronological;
+          renderChronological(payload.chronological);
           dayTotal.textContent = `${payload.day_total_day}: ${payload.day_total}`;
           weekTotal.textContent = `${payload.week_start} to ${payload.week_end}: ${payload.week_total}`;
           dashboardStatus.textContent = "";
@@ -569,6 +585,7 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
     .clock-report-heading input { margin-left: 6px; }
     .clock-report pre { overflow-x: auto; margin: 8px 0 0 0; padding: 12px; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; }
     .clock-report code { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
+    .clock-gap-row { color: #656d76; }
   </style>
 </head>
 <body>

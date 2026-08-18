@@ -167,14 +167,24 @@
 
 (defun org-timeviz-dashboard--clocklog-text (date-str rows)
   "Render chronological clock ROWS for DATE-STR."
-  (let* ((display-rows
-          (mapcar
-           (lambda (row)
-             (list (org-timeviz-dashboard--link-description (nth 3 row))
-                   (my/org-clocklog--fmt-hhmm (nth 0 row))
-                   (my/org-clocklog--fmt-hhmm (nth 1 row))
-                   (my/org-clocklog--fmt-dur (nth 2 row))))
-           rows)))
+  (let ((display-rows '())
+        (previous-row nil))
+    (dolist (row rows)
+      (when (and previous-row (< (nth 1 previous-row) (nth 0 row)))
+        (let ((gap-start (nth 1 previous-row))
+              (gap-end (nth 0 row)))
+          (push (list "GAP"
+                      (my/org-clocklog--fmt-hhmm gap-start)
+                      (my/org-clocklog--fmt-hhmm gap-end)
+                      (my/org-clocklog--fmt-dur (/ (- gap-end gap-start) 60.0)))
+                display-rows)))
+      (push (list (org-timeviz-dashboard--link-description (nth 3 row))
+                  (my/org-clocklog--fmt-hhmm (nth 0 row))
+                  (my/org-clocklog--fmt-hhmm (nth 1 row))
+                  (my/org-clocklog--fmt-dur (nth 2 row)))
+            display-rows)
+      (setq previous-row row))
+    (setq display-rows (nreverse display-rows))
     (if display-rows
         (org-timeviz-dashboard--render-table
          '("Task" "Start" "End" "Duration")
