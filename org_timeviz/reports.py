@@ -132,6 +132,9 @@ def generate_all_reports(cfg: AppConfig) -> None:
         all_time_records,
         assets_root / INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME,
         time_buckets_cfg=cfg.time_buckets,
+        low_opacity_task_titles=(
+            cfg.reports.plots.calendar_view_by_time_bucket.low_opacity_task_titles
+        ),
         initial_start=initial_interactive_window.start,
         initial_end=initial_interactive_window.end,
     )

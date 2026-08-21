@@ -3,11 +3,14 @@ from datetime import date, datetime
 from pathlib import Path
 
 import pytest
+from conftest import make_clipped, make_record
 
+from org_timeviz.aggregate import compute_aggregates
 from org_timeviz.config import TimeBucketsConfig
 from org_timeviz.rendering.index import write_index_html
 from org_timeviz.rendering.interactive_time_bucket import (
     _bucket_hours_for_interval,
+    _build_calendar_figure,
     _calendar_slices,
     _format_minute,
     _prepare_records,
@@ -21,9 +24,6 @@ from org_timeviz.rendering.monthly_time_buckets import (
     write_monthly_time_buckets_summary_json,
 )
 from org_timeviz.rendering.plots import plot_timeseries_daily_total, write_summary_json
-from org_timeviz.aggregate import compute_aggregates
-
-from conftest import make_clipped, make_record
 
 
 def test_monthly_time_buckets_split_record_across_months(bucket_cfg: TimeBucketsConfig) -> None:
@@ -128,6 +128,40 @@ def test_interactive_helpers_are_stable(bucket_cfg: TimeBucketsConfig) -> None:
     assert _script_safe_json('{"x":"</script>"}') == '{"x":"<\\/script>"}'
 
 
+def test_calendar_uses_low_opacity_only_for_configured_task_titles(
+    bucket_cfg: TimeBucketsConfig,
+) -> None:
+    records = [
+        make_clipped(
+            make_record(
+                start=datetime(2026, 1, 1, 9),
+                end=datetime(2026, 1, 1, 10),
+                tags=("job",),
+                headline="after lunch walk",
+            )
+        ),
+        make_clipped(
+            make_record(
+                start=datetime(2026, 1, 1, 10),
+                end=datetime(2026, 1, 1, 11),
+                tags=("job",),
+                headline="Focused work",
+            )
+        ),
+    ]
+    figure = _build_calendar_figure(
+        _prepare_records(records, bucket_cfg),
+        bucket_order=bucket_cfg.bucket_order,
+        color_by_bucket=_time_bucket_colors(bucket_cfg.bucket_order),
+        low_opacity_task_titles=["after lunch walk"],
+        initial_start=datetime(2026, 1, 1),
+        initial_end=datetime(2026, 1, 2),
+    )
+
+    assert list(figure.data[0].marker.opacity) == [0.5, 1.0]
+    assert figure.data[1].marker.opacity == ()
+
+
 def test_interactive_dashboard_contains_task_and_linking_script(
     tmp_path: Path, bucket_cfg: TimeBucketsConfig
 ) -> None:
@@ -144,11 +178,13 @@ def test_interactive_dashboard_contains_task_and_linking_script(
         [record],
         out,
         time_buckets_cfg=bucket_cfg,
+        low_opacity_task_titles=["Hover task"],
         initial_start=datetime(2026, 1, 1),
         initial_end=datetime(2026, 1, 2),
     )
     text = out.read_text(encoding="utf-8")
     assert "Hover task" in text
+    assert '"opacity":[0.5]' in text
     assert 'calendar.on("plotly_relayout"' in text
     assert "bucketHours" in text
 

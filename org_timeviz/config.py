@@ -77,11 +77,29 @@ class FiltersConfig(_BaseConfig):
     exclude_task_regex: list[str] = Field(default_factory=list)
 
 
+class CalendarViewByTimeBucketConfig(_BaseConfig):
+    """Configure the calendar portion of the interactive time-bucket dashboard."""
+
+    low_opacity_task_titles: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_task_titles(self) -> Self:
+        """Reject duplicate task titles in the low-opacity list."""
+        _ensure_unique(
+            self.low_opacity_task_titles,
+            "reports.plots.calendar_view_by_time_bucket.low_opacity_task_titles",
+        )
+        return self
+
+
 class PlotsConfig(_BaseConfig):
     """Hold plot settings shared by all generated reports."""
 
     # If null, timeseries spans the full data range.
     timeseries_last_n_days: int | None = Field(default=None)
+    calendar_view_by_time_bucket: CalendarViewByTimeBucketConfig = Field(
+        default_factory=CalendarViewByTimeBucketConfig
+    )
 
 
 class TimeBucketRuleConfig(_BaseConfig):

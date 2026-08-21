@@ -1,10 +1,11 @@
 """Generate a linked interactive calendar and time-bucket bar chart."""
 
 import json
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
-from typing import Final, Iterable
+from typing import Final
 
 import plotly.graph_objects as go
 from matplotlib import colormaps
@@ -18,6 +19,7 @@ from ..time_bucket_resolver import resolve_time_bucket_allocations
 DAY_WIDTH_MS: Final[float] = 0.90 * 24.0 * 60.0 * 60.0 * 1000.0
 CALENDAR_HEIGHT: Final[int] = 650
 HISTOGRAM_HEIGHT: Final[int] = 420
+LOW_OPACITY: Final[float] = 0.5
 
 
 @dataclass(frozen=True)
@@ -47,6 +49,7 @@ def write_interactive_time_bucket_dashboard(
     out_path: Path,
     *,
     time_buckets_cfg: TimeBucketsConfig,
+    low_opacity_task_titles: Collection[str],
     initial_start: datetime,
     initial_end: datetime,
 ) -> None:
@@ -58,6 +61,7 @@ def write_interactive_time_bucket_dashboard(
         prepared_records,
         bucket_order=time_buckets_cfg.bucket_order,
         color_by_bucket=color_by_bucket,
+        low_opacity_task_titles=low_opacity_task_titles,
         initial_start=initial_start,
         initial_end=initial_end,
     )
@@ -69,7 +73,7 @@ def write_interactive_time_bucket_dashboard(
         initial_end=initial_end,
     )
 
-    payload = [
+    payload: list[dict[str, object]] = [
         {
             "start": record.start.isoformat(timespec="seconds"),
             "end": record.end.isoformat(timespec="seconds"),
@@ -163,11 +167,13 @@ def _build_calendar_figure(
     *,
     bucket_order: list[str],
     color_by_bucket: dict[str, str],
+    low_opacity_task_titles: Collection[str],
     initial_start: datetime,
     initial_end: datetime,
 ) -> go.Figure:
     """Build the interactive calendar figure using one trace per bucket."""
     slices = _calendar_slices(records)
+    low_opacity_titles = set(low_opacity_task_titles)
     figure = go.Figure()
 
     for bucket_name in bucket_order:
@@ -179,7 +185,14 @@ def _build_calendar_figure(
                 y=[float(item.minutes) / 60.0 for item in bucket_slices],
                 base=[float(item.start_minute) / 60.0 for item in bucket_slices],
                 width=[DAY_WIDTH_MS for _ in bucket_slices],
-                marker={"color": color_by_bucket[bucket_name], "line": {"width": 0}},
+                marker={
+                    "color": color_by_bucket[bucket_name],
+                    "opacity": [
+                        LOW_OPACITY if item.task_title in low_opacity_titles else 1.0
+                        for item in bucket_slices
+                    ],
+                    "line": {"width": 0},
+                },
                 customdata=[
                     [
                         item.task_title,

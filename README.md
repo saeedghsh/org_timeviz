@@ -120,6 +120,11 @@ shared filters and plot settings; it does not list report names.
   reports
 * `reports.plots`:
   * `timeseries_last_n_days`: if null, use all time; otherwise last N days
+  * `calendar_view_by_time_bucket.low_opacity_task_titles`: exact,
+    case-sensitive task titles whose blocks use 50% opacity in the interactive
+    calendar-by-time-bucket view. This only changes the calendar's appearance;
+    the linked histogram and all other reports still count and render the tasks
+    normally.
 * `time_buckets`:
   * `other_bucket`: fallback bucket when no time-bucket tag matches
   * `bucket_order`: canonical time-bucket names and display/order priority
@@ -152,6 +157,21 @@ In the interactive calendar, each clocked block is colored by its dominant
 resolved time bucket after arbitration. If arbitration splits a task across
 multiple buckets, the largest resolved share determines the calendar color,
 while the linked histogram uses the full allocation fractions.
+
+Task titles listed under
+`reports.plots.calendar_view_by_time_bucket.low_opacity_task_titles` are shown
+at half opacity in this calendar. Matching uses the task title after its TODO
+status keyword has been removed and is exact and case-sensitive. For example:
+
+```yaml
+reports:
+  plots:
+    calendar_view_by_time_bucket:
+      low_opacity_task_titles:
+        - after lunch walk
+        - procrastination
+        - unwell
+```
 
 ## Time buckets from tags
 

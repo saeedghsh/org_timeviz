@@ -37,7 +37,24 @@ time_buckets:
     cfg = AppConfig.from_yaml(path)
     assert cfg.app.output_dir == "outputs"
     assert cfg.reports.plots.timeseries_last_n_days is None
+    assert cfg.reports.plots.calendar_view_by_time_bucket.low_opacity_task_titles == []
     assert cfg.time_buckets.tag_to_bucket == {"job": "work"}
+
+
+def test_duplicate_low_opacity_task_titles_are_rejected() -> None:
+    with pytest.raises(ValidationError):
+        AppConfig.model_validate(
+            {
+                "reports": {
+                    "plots": {
+                        "calendar_view_by_time_bucket": {
+                            "low_opacity_task_titles": ["break", "break"]
+                        }
+                    }
+                },
+                "time_buckets": _base_time_buckets(),
+            }
+        )
 
 
 def test_extra_config_fields_are_rejected() -> None:

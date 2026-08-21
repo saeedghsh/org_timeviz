@@ -22,6 +22,13 @@ reports:
     # If null, timeseries spans the full data range.
     timeseries_last_n_days: null
 
+    calendar_view_by_time_bucket:
+      # Exact, case-sensitive task titles rendered at 50% opacity in this calendar only.
+      low_opacity_task_titles:
+        - after lunch walk
+        - procrastination
+        - unwell
+
 time_buckets:
   other_bucket: other
   bucket_order:
