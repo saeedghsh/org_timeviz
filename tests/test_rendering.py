@@ -8,6 +8,7 @@ from conftest import make_clipped, make_record
 from org_timeviz.aggregate import compute_aggregates
 from org_timeviz.config import TimeBucketsConfig
 from org_timeviz.rendering.index import write_index_html
+from org_timeviz.rendering.daily_working_hours import write_daily_working_hours_html
 from org_timeviz.rendering.interactive_time_bucket import (
     _bucket_hours_for_interval,
     _build_calendar_figure,
@@ -23,7 +24,7 @@ from org_timeviz.rendering.monthly_time_buckets import (
     write_monthly_time_buckets_html,
     write_monthly_time_buckets_summary_json,
 )
-from org_timeviz.rendering.plots import plot_timeseries_daily_total, write_summary_json
+from org_timeviz.rendering.plots import write_summary_json
 
 
 def test_monthly_time_buckets_split_record_across_months(bucket_cfg: TimeBucketsConfig) -> None:
@@ -211,12 +212,14 @@ def test_timeseries_and_summary_outputs(tmp_path: Path, bucket_cfg: TimeBucketsC
         ),
     ]
     aggs = compute_aggregates(records, bucket_cfg)
-    png = tmp_path / "timeseries.png"
+    html = tmp_path / "timeseries.html"
     summary = tmp_path / "summary.json"
-    plot_timeseries_daily_total(aggs, png)
+    write_daily_working_hours_html(aggs, html)
     write_summary_json(aggs, summary)
+    html_text = html.read_text(encoding="utf-8")
     payload = json.loads(summary.read_text(encoding="utf-8"))
-    assert png.exists() and png.stat().st_size > 0
+    assert "Plotly.newPlot" in html_text
+    assert "Weekly avg / workday" in html_text
     assert payload["hours_total"] == pytest.approx(3.0)
     assert payload["minutes_by_task_top50"] == {"A": 60.0, "B": 120.0}
 
@@ -227,9 +230,11 @@ def test_index_ignores_deprecated_pngs_and_embeds_interactive_dashboard(tmp_path
     assets.mkdir(parents=True)
     (assets / "calendar_view__time_bucket__month__old.png").write_bytes(b"old")
     (assets / "histogram__time_bucket__month__old.png").write_bytes(b"old")
-    current = "timeseries__daily_working_hours__day__all_time.png"
+    deprecated_daily = "timeseries__daily_working_hours__day__all_time.png"
+    current_daily = "timeseries__daily_working_hours__day__all_time.html"
     deprecated_monthly = "timeseries__time_bucket__month__all_time.png"
-    (assets / current).write_bytes(b"png")
+    (assets / deprecated_daily).write_bytes(b"old")
+    (assets / current_daily).write_text("dashboard", encoding="utf-8")
     (assets / deprecated_monthly).write_bytes(b"old")
     (assets / "interactive__time_bucket.html").write_text("dashboard", encoding="utf-8")
     (assets / "timeseries__time_bucket__month__all_time.html").write_text("dashboard", encoding="utf-8")
@@ -237,8 +242,9 @@ def test_index_ignores_deprecated_pngs_and_embeds_interactive_dashboard(tmp_path
     index_path = write_index_html(out_root, assets)
     text = index_path.read_text(encoding="utf-8")
     assert "interactive__time_bucket.html" in text
+    assert current_daily in text
+    assert deprecated_daily not in text
     assert "timeseries__time_bucket__month__all_time.html" in text
-    assert current in text
     assert deprecated_monthly not in text
     assert "calendar_view__time_bucket__month__old.png" not in text
     assert "histogram__time_bucket__month__old.png" not in text
@@ -254,9 +260,9 @@ def test_empty_monthly_and_timeseries_plots_are_still_valid_files(
     assert monthly_html.exists() and monthly_html.stat().st_size > 0
 
     empty_aggs = compute_aggregates([], bucket_cfg)
-    daily_png = tmp_path / "empty-daily.png"
-    plot_timeseries_daily_total(empty_aggs, daily_png)
-    assert daily_png.exists() and daily_png.stat().st_size > 0
+    daily_html = tmp_path / "empty-daily.html"
+    write_daily_working_hours_html(empty_aggs, daily_html)
+    assert daily_html.exists() and daily_html.stat().st_size > 0
 
 
 def test_index_routes_unparsed_pngs_to_other_gallery(tmp_path: Path) -> None:

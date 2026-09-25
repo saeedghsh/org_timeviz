@@ -11,13 +11,14 @@ from .models import ClockRecord
 from .org_source.emacs import parse_org_clock_records_emacs
 from .org_source.inputs import configure_emacs_init, resolve_org_inputs
 from .rendering.index import INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME, write_index_html
+from .rendering.daily_working_hours import write_daily_working_hours_html
 from .rendering.interactive_time_bucket import write_interactive_time_bucket_dashboard
 from .rendering.monthly_time_buckets import (
     compute_monthly_time_buckets,
     write_monthly_time_buckets_html,
     write_monthly_time_buckets_summary_json,
 )
-from .rendering.plots import plot_timeseries_daily_total, write_summary_json
+from .rendering.plots import write_summary_json
 from .time_windows import (
     TimeWindow,
     at_midnight,
@@ -55,9 +56,9 @@ def _write_timeseries_report(
     stem: str,
 ) -> None:
     """Write the daily-total timeseries plot and its summary."""
-    plot_timeseries_daily_total(
+    write_daily_working_hours_html(
         aggs,
-        assets_root / f"{stem}.png",
+        assets_root / f"{stem}.html",
     )
     write_summary_json(aggs, assets_root / f"{stem}__summary.json")
 

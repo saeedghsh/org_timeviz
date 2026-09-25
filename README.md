@@ -9,8 +9,8 @@ source of truth.
 * Parses `CLOCK` lines and associates them with headline path and inherited tags
 * Applies time periods and filters from YAML config
 * Resolves configured time-bucket allocations from tags
-* Generates static plots, an interactive time-bucket dashboard, an HTML index,
-  and JSON summaries for static reports
+* Generates interactive HTML reports, an interactive time-bucket dashboard, an
+  HTML index, and JSON summaries for report data
 * Serves live text clock reports above the plots when using `make serve`
 
 ## Running and refreshing reports
@@ -137,7 +137,7 @@ titles in plots exclude states like TODO/IN-PROGRESS/BLOCKED/etc.
 ## Outputs
 
 Artifacts are written under `outputs/assets/`, and `outputs/index.html` is the
-landing page. Static plots have matching JSON summaries next to them.
+landing page. Interactive reports have matching JSON summaries next to them.
 
 Generated artifacts currently include:
 
@@ -147,9 +147,9 @@ Generated artifacts currently include:
 Static Matplotlib `calendar_view` PNGs are no longer generated; the interactive
 dashboard is the supported calendar view.
 
-* `timeseries__daily_working_hours__day__all_time.png`: daily working-hours
-  timeseries and matching summary JSON. If `timeseries_last_n_days` is set, the
-  filename contains that rolling date range instead of `all_time`.
+* `timeseries__daily_working_hours__day__all_time.html`: interactive daily
+  working-hours timeseries and matching summary JSON. If `timeseries_last_n_days`
+  is set, the filename contains that rolling date range instead of `all_time`.
 * `timeseries__time_bucket__month__all_time.html`: interactive monthly
   time-bucket trend and matching summary JSON.
 

@@ -8,17 +8,17 @@ from typing import Iterable
 
 INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME = "interactive__time_bucket.html"
 INTERACTIVE_MONTHLY_TIME_BUCKET_NAME = "timeseries__time_bucket__month__all_time.html"
+INTERACTIVE_DAILY_WORKING_HOURS_PREFIX = "timeseries__daily_working_hours__day__"
 
 DEPRECATED_PNG_PREFIXES = (
     "calendar_view__task__",
     "calendar_view__time_bucket__",
     "histogram__time_bucket__",
     "timeseries__time_bucket__month__",
+    "timeseries__daily_working_hours__day__",
 )
 
-FRONT_MATTER_SELECTORS = [
-    "timeseries__daily_working_hours__day__all_time.png",
-]
+FRONT_MATTER_SELECTORS: list[str] = []
 
 _RANGE_LABEL_RE = re.compile(
     r"^(?P<start>\d{4}-\d{2}-\d{2})_to_(?P<end>\d{4}-\d{2}-\d{2})(?:__(?P<kind>latest))?$"
@@ -103,6 +103,16 @@ def _resolve_front_matter_items(
     return selected
 
 
+def _resolve_interactive_daily_working_hours_name(assets_dir: Path) -> str | None:
+    """Resolve the generated daily working-hours HTML report, if present."""
+    matches = sorted(
+        path_obj.name
+        for path_obj in assets_dir.glob("*.html")
+        if path_obj.name.startswith(INTERACTIVE_DAILY_WORKING_HOURS_PREFIX)
+    )
+    return matches[-1] if matches else None
+
+
 def _label_sort_key(label: str) -> tuple[int, int | str]:
     if label == "all_time":
         return (0, 0)
@@ -175,16 +185,37 @@ def _wrap_interactive_monthly_time_bucket(asset_prefix: str) -> str:
     )
 
 
+def _wrap_interactive_daily_working_hours(asset_prefix: str, html_name: str) -> str:
+    dashboard_href = html.escape(f"{asset_prefix}/{html_name}")
+    title = html.escape(html_name[:-5])
+    return (
+        '<section class="gallery-item">\n'
+        f"  <h2>{title}</h2>\n"
+        f'  <div class="links"><a href="{dashboard_href}">open interactive view</a></div>\n'
+        f'  <iframe class="interactive-dashboard interactive-daily-working-hours" src="{dashboard_href}" '
+        'title="Interactive daily working-hours timeseries"></iframe>\n'
+        "</section>\n"
+    )
+
+
 def _front_matter_section(
     items: Iterable[_PlotItem],
     asset_prefix: str,
     *,
     include_interactive_time_bucket: bool,
     include_interactive_monthly_time_bucket: bool,
+    interactive_daily_working_hours_name: str | None,
 ) -> str:
     body_parts: list[str] = []
     if include_interactive_time_bucket:
         body_parts.append(_wrap_interactive_time_bucket(asset_prefix))
+    if interactive_daily_working_hours_name is not None:
+        body_parts.append(
+            _wrap_interactive_daily_working_hours(
+                asset_prefix,
+                interactive_daily_working_hours_name,
+            )
+        )
     if include_interactive_monthly_time_bucket:
         body_parts.append(_wrap_interactive_monthly_time_bucket(asset_prefix))
 
@@ -487,6 +518,9 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
     interactive_monthly_time_bucket_exists = (
         assets_dir / INTERACTIVE_MONTHLY_TIME_BUCKET_NAME
     ).exists()
+    interactive_daily_working_hours_name = (
+        _resolve_interactive_daily_working_hours_name(assets_dir)
+    )
 
     items_by_png = {
         png_name: _PlotItem(
@@ -583,6 +617,7 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
     h2 { font-size: 18px; margin: 0 0 8px 0; }
     .plot { display: block; max-width: 100%%; height: auto; margin: 8px 0 0 0; border: 1px solid #ddd; }
     .interactive-dashboard { display: block; width: 100%%; height: 1100px; margin: 8px 0 0 0; border: 1px solid #ddd; }
+    .interactive-daily-working-hours { height: 650px; }
     .links { margin-top: 6px; }
     .featured-gallery { margin-bottom: 28px; }
     .gallery-item { margin: 0 0 28px 0; }
@@ -624,6 +659,7 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
             asset_prefix,
             include_interactive_time_bucket=interactive_time_bucket_exists,
             include_interactive_monthly_time_bucket=interactive_monthly_time_bucket_exists,
+            interactive_daily_working_hours_name=interactive_daily_working_hours_name,
         ),
     )
 
