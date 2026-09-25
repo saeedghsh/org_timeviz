@@ -38,6 +38,7 @@ time_buckets:
     - ml_tooling_tutorial
     - aim_flix
     - msc
+    - keeper
     - hh
     - holidays_vacations
     - sick_leave
@@ -50,6 +51,7 @@ time_buckets:
     ml_tooling_tutorial: ml_tooling_tutorial
     aim_flix: aim_flix
     msc: msc
+    keeper: keeper
     hh: hh
     ite: hh
     isdd: hh
@@ -66,6 +68,7 @@ time_buckets:
       - ml_tooling_tutorial
       - aim_flix
       - msc
+      - keeper
       - hh
       - holidays_vacations
       - sick_leave
