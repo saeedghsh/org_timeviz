@@ -7,15 +7,16 @@ from pathlib import Path
 from typing import Iterable
 
 INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME = "interactive__time_bucket.html"
+INTERACTIVE_MONTHLY_TIME_BUCKET_NAME = "timeseries__time_bucket__month__all_time.html"
 
 DEPRECATED_PNG_PREFIXES = (
     "calendar_view__task__",
     "calendar_view__time_bucket__",
     "histogram__time_bucket__",
+    "timeseries__time_bucket__month__",
 )
 
 FRONT_MATTER_SELECTORS = [
-    "timeseries__time_bucket__month__all_time.png",
     "timeseries__daily_working_hours__day__all_time.png",
 ]
 
@@ -162,15 +163,30 @@ def _wrap_interactive_time_bucket(asset_prefix: str) -> str:
     )
 
 
+def _wrap_interactive_monthly_time_bucket(asset_prefix: str) -> str:
+    dashboard_href = html.escape(f"{asset_prefix}/{INTERACTIVE_MONTHLY_TIME_BUCKET_NAME}")
+    return (
+        '<section class="gallery-item">\n'
+        "  <h2>timeseries__time_bucket__month__all_time</h2>\n"
+        f'  <div class="links"><a href="{dashboard_href}">open interactive view</a></div>\n'
+        f'  <iframe class="interactive-dashboard" src="{dashboard_href}" '
+        'title="Interactive monthly time-bucket trends"></iframe>\n'
+        "</section>\n"
+    )
+
+
 def _front_matter_section(
     items: Iterable[_PlotItem],
     asset_prefix: str,
     *,
     include_interactive_time_bucket: bool,
+    include_interactive_monthly_time_bucket: bool,
 ) -> str:
     body_parts: list[str] = []
     if include_interactive_time_bucket:
         body_parts.append(_wrap_interactive_time_bucket(asset_prefix))
+    if include_interactive_monthly_time_bucket:
+        body_parts.append(_wrap_interactive_monthly_time_bucket(asset_prefix))
 
     body_parts.extend(_wrap_gallery_item(item, asset_prefix=asset_prefix) for item in items)
     if not body_parts:
@@ -468,6 +484,9 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
     pngs = _discover_pngs(assets_dir)
     asset_prefix = assets_dir.name
     interactive_time_bucket_exists = (assets_dir / INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME).exists()
+    interactive_monthly_time_bucket_exists = (
+        assets_dir / INTERACTIVE_MONTHLY_TIME_BUCKET_NAME
+    ).exists()
 
     items_by_png = {
         png_name: _PlotItem(
@@ -604,6 +623,7 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
             featured_items,
             asset_prefix,
             include_interactive_time_bucket=interactive_time_bucket_exists,
+            include_interactive_monthly_time_bucket=interactive_monthly_time_bucket_exists,
         ),
     )
 

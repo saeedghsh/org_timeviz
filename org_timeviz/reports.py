@@ -14,7 +14,7 @@ from .rendering.index import INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME, write_index
 from .rendering.interactive_time_bucket import write_interactive_time_bucket_dashboard
 from .rendering.monthly_time_buckets import (
     compute_monthly_time_buckets,
-    plot_monthly_time_buckets,
+    write_monthly_time_buckets_html,
     write_monthly_time_buckets_summary_json,
 )
 from .rendering.plots import plot_timeseries_daily_total, write_summary_json
@@ -67,10 +67,10 @@ def _write_time_buckets_report(
     assets_root: Path,
     cfg: AppConfig,
 ) -> None:
-    """Write the monthly time-bucket plot and its summary."""
+    """Write the interactive monthly time-bucket trend and its summary."""
     stem = "timeseries__time_bucket__month__all_time"
     report = compute_monthly_time_buckets(filtered_records, cfg.time_buckets)
-    plot_monthly_time_buckets(report, assets_root / f"{stem}.png")
+    write_monthly_time_buckets_html(report, assets_root / f"{stem}.html")
     write_monthly_time_buckets_summary_json(report, assets_root / f"{stem}__summary.json")
 
 

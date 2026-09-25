@@ -150,8 +150,8 @@ dashboard is the supported calendar view.
 * `timeseries__daily_working_hours__day__all_time.png`: daily working-hours
   timeseries and matching summary JSON. If `timeseries_last_n_days` is set, the
   filename contains that rolling date range instead of `all_time`.
-* `timeseries__time_bucket__month__all_time.png`: monthly time-bucket trend and
-  matching summary JSON.
+* `timeseries__time_bucket__month__all_time.html`: interactive monthly
+  time-bucket trend and matching summary JSON.
 
 In the interactive calendar, each clocked block is colored by its dominant
 resolved time bucket after arbitration. If arbitration splits a task across

@@ -20,7 +20,7 @@ from org_timeviz.rendering.interactive_time_bucket import (
 )
 from org_timeviz.rendering.monthly_time_buckets import (
     compute_monthly_time_buckets,
-    plot_monthly_time_buckets,
+    write_monthly_time_buckets_html,
     write_monthly_time_buckets_summary_json,
 )
 from org_timeviz.rendering.plots import plot_timeseries_daily_total, write_summary_json
@@ -52,12 +52,14 @@ def test_monthly_time_bucket_outputs(tmp_path: Path, bucket_cfg: TimeBucketsConf
         )
     )
     report = compute_monthly_time_buckets([record], bucket_cfg)
-    png = tmp_path / "monthly.png"
+    html = tmp_path / "monthly.html"
     summary = tmp_path / "monthly.json"
-    plot_monthly_time_buckets(report, png)
+    write_monthly_time_buckets_html(report, html)
     write_monthly_time_buckets_summary_json(report, summary)
+    html_text = html.read_text(encoding="utf-8")
     payload = json.loads(summary.read_text(encoding="utf-8"))
-    assert png.exists() and png.stat().st_size > 0
+    assert "Plotly.newPlot" in html_text
+    assert "monthly-time-bucket-percent" in html_text
     assert payload["hours_by_bucket"]["work"]["2026-01-01"] == pytest.approx(1.0)
     assert payload["percent_by_bucket"]["work"]["2026-01-01"] == pytest.approx(100.0)
 
@@ -226,13 +228,18 @@ def test_index_ignores_deprecated_pngs_and_embeds_interactive_dashboard(tmp_path
     (assets / "calendar_view__time_bucket__month__old.png").write_bytes(b"old")
     (assets / "histogram__time_bucket__month__old.png").write_bytes(b"old")
     current = "timeseries__daily_working_hours__day__all_time.png"
+    deprecated_monthly = "timeseries__time_bucket__month__all_time.png"
     (assets / current).write_bytes(b"png")
+    (assets / deprecated_monthly).write_bytes(b"old")
     (assets / "interactive__time_bucket.html").write_text("dashboard", encoding="utf-8")
+    (assets / "timeseries__time_bucket__month__all_time.html").write_text("dashboard", encoding="utf-8")
 
     index_path = write_index_html(out_root, assets)
     text = index_path.read_text(encoding="utf-8")
     assert "interactive__time_bucket.html" in text
+    assert "timeseries__time_bucket__month__all_time.html" in text
     assert current in text
+    assert deprecated_monthly not in text
     assert "calendar_view__time_bucket__month__old.png" not in text
     assert "histogram__time_bucket__month__old.png" not in text
     assert 'class="outputs-section"' not in text
@@ -242,9 +249,9 @@ def test_empty_monthly_and_timeseries_plots_are_still_valid_files(
     tmp_path: Path, bucket_cfg: TimeBucketsConfig
 ) -> None:
     monthly = compute_monthly_time_buckets([], bucket_cfg)
-    monthly_png = tmp_path / "empty-monthly.png"
-    plot_monthly_time_buckets(monthly, monthly_png)
-    assert monthly_png.exists() and monthly_png.stat().st_size > 0
+    monthly_html = tmp_path / "empty-monthly.html"
+    write_monthly_time_buckets_html(monthly, monthly_html)
+    assert monthly_html.exists() and monthly_html.stat().st_size > 0
 
     empty_aggs = compute_aggregates([], bucket_cfg)
     daily_png = tmp_path / "empty-daily.png"
