@@ -7,8 +7,8 @@ from conftest import make_clipped, make_record
 
 from org_timeviz.aggregate import compute_aggregates
 from org_timeviz.config import TimeBucketsConfig
-from org_timeviz.rendering.index import write_index_html
 from org_timeviz.rendering.daily_working_hours import write_daily_working_hours_html
+from org_timeviz.rendering.index import write_index_html
 from org_timeviz.rendering.interactive_time_bucket import (
     _bucket_hours_for_interval,
     _build_calendar_figure,
@@ -224,7 +224,9 @@ def test_timeseries_and_summary_outputs(tmp_path: Path, bucket_cfg: TimeBucketsC
     assert payload["minutes_by_task_top50"] == {"A": 60.0, "B": 120.0}
 
 
-def test_index_ignores_deprecated_pngs_and_embeds_interactive_dashboard(tmp_path: Path) -> None:
+def test_visualizations_page_ignores_deprecated_pngs_and_embeds_dashboards(
+    tmp_path: Path,
+) -> None:
     out_root = tmp_path / "outputs"
     assets = out_root / "assets"
     assets.mkdir(parents=True)
@@ -237,18 +239,28 @@ def test_index_ignores_deprecated_pngs_and_embeds_interactive_dashboard(tmp_path
     (assets / current_daily).write_text("dashboard", encoding="utf-8")
     (assets / deprecated_monthly).write_bytes(b"old")
     (assets / "interactive__time_bucket.html").write_text("dashboard", encoding="utf-8")
-    (assets / "timeseries__time_bucket__month__all_time.html").write_text("dashboard", encoding="utf-8")
+    (assets / "timeseries__time_bucket__month__all_time.html").write_text(
+        "dashboard", encoding="utf-8"
+    )
 
     index_path = write_index_html(out_root, assets)
-    text = index_path.read_text(encoding="utf-8")
-    assert "interactive__time_bucket.html" in text
-    assert current_daily in text
-    assert deprecated_daily not in text
-    assert "timeseries__time_bucket__month__all_time.html" in text
-    assert deprecated_monthly not in text
-    assert "calendar_view__time_bucket__month__old.png" not in text
-    assert "histogram__time_bucket__month__old.png" not in text
-    assert 'class="outputs-section"' not in text
+    index_text = index_path.read_text(encoding="utf-8")
+    visualizations_text = (out_root / "visualizations.html").read_text(encoding="utf-8")
+
+    assert 'href="visualizations.html">View visualizations</a>' in index_text
+    assert "interactive__time_bucket.html" not in index_text
+    assert current_daily not in index_text
+    assert "timeseries__time_bucket__month__all_time.html" not in index_text
+
+    assert 'href="index.html">View text reports</a>' in visualizations_text
+    assert "interactive__time_bucket.html" in visualizations_text
+    assert current_daily in visualizations_text
+    assert deprecated_daily not in visualizations_text
+    assert "timeseries__time_bucket__month__all_time.html" in visualizations_text
+    assert deprecated_monthly not in visualizations_text
+    assert "calendar_view__time_bucket__month__old.png" not in visualizations_text
+    assert "histogram__time_bucket__month__old.png" not in visualizations_text
+    assert 'class="outputs-section"' not in visualizations_text
 
 
 def test_empty_monthly_and_timeseries_plots_are_still_valid_files(
@@ -271,5 +283,6 @@ def test_index_routes_unparsed_pngs_to_other_gallery(tmp_path: Path) -> None:
     assets.mkdir(parents=True)
     (assets / "misc.png").write_bytes(b"png")
     write_index_html(out_root, assets)
-    assert "other.html" in (out_root / "index.html").read_text(encoding="utf-8")
+    assert "other.html" not in (out_root / "index.html").read_text(encoding="utf-8")
+    assert "other.html" in (out_root / "visualizations.html").read_text(encoding="utf-8")
     assert "misc.png" in (out_root / "other.html").read_text(encoding="utf-8")

@@ -136,8 +136,10 @@ titles in plots exclude states like TODO/IN-PROGRESS/BLOCKED/etc.
 
 ## Outputs
 
-Artifacts are written under `outputs/assets/`, and `outputs/index.html` is the
-landing page. Interactive reports have matching JSON summaries next to them.
+Artifacts are written under `outputs/assets/`. `outputs/index.html` is the
+text-report landing page and links to `outputs/visualizations.html`, which
+contains the interactive visualizations. Interactive reports have matching
+JSON summaries next to them.
 
 Generated artifacts currently include:
 

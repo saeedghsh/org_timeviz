@@ -2,13 +2,15 @@
 
 import html
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from string import Template
 
 INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME = "interactive__time_bucket.html"
 INTERACTIVE_MONTHLY_TIME_BUCKET_NAME = "timeseries__time_bucket__month__all_time.html"
 INTERACTIVE_DAILY_WORKING_HOURS_PREFIX = "timeseries__daily_working_hours__day__"
+VISUALIZATIONS_PAGE_NAME = "visualizations.html"
 
 DEPRECATED_PNG_PREFIXES = (
     "calendar_view__task__",
@@ -236,32 +238,34 @@ def _gallery_page_html(
     body = "\n".join(_wrap_gallery_item(item, asset_prefix=asset_prefix) for item in items)
     title_esc = html.escape(title)
 
-    return """\
+    return Template(
+        """\
 <!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>%s</title>
+  <title>$title</title>
   <style>
     body { font-family: sans-serif; margin: 16px; max-width: 1100px; }
     h1 { font-size: 22px; margin: 0 0 16px 0; }
     h2 { font-size: 18px; margin: 0 0 8px 0; }
-    .plot { display: block; max-width: 100%%; height: auto; margin: 8px 0 0 0; border: 1px solid #ddd; }
+    .plot { display: block; max-width: 100%; height: auto; margin: 8px 0 0 0; border: 1px solid #ddd; }
     .links { margin-top: 6px; }
     .gallery-item { margin: 0 0 28px 0; }
     .back-link { margin: 0 0 20px 0; }
   </style>
 </head>
 <body>
-  <div class="back-link"><a href="index.html">back to index</a></div>
-  <h1>%s</h1>
-  %s
+  <div class="back-link"><a href="$visualizations_page">back to visualizations</a></div>
+  <h1>$title</h1>
+  $body
 </body>
 </html>
-""" % (
-        title_esc,
-        title_esc,
-        body,
+"""
+    ).substitute(
+        title=title_esc,
+        body=body,
+        visualizations_page=VISUALIZATIONS_PAGE_NAME,
     )
 
 
@@ -366,6 +370,16 @@ def _refresh_controls_html() -> str:
 """
 
 
+def _page_navigation_html(*, href: str, label: str) -> str:
+    """Render a prominent link between the reports and visualizations pages."""
+    return (
+        '  <nav class="page-navigation" aria-label="Report pages">\n'
+        f'    <a class="page-navigation-button" href="{html.escape(href)}">'
+        f"{html.escape(label)}</a>\n"
+        "  </nav>\n"
+    )
+
+
 def _clock_dashboard_html() -> str:
     """Render live text clock reports and date/week controls."""
     return """\
@@ -379,7 +393,7 @@ def _clock_dashboard_html() -> str:
     </div>
     <p class="clock-dashboard-note">
       Live clocks are counted through the current time. Changing the date or week updates only
-      these text reports; it does not regenerate the plots below.
+      these text reports; it does not regenerate the visualizations.
     </p>
 
     <article class="clock-report">
@@ -508,7 +522,7 @@ def _clock_dashboard_html() -> str:
 
 
 def write_index_html(out_root: Path, assets_dir: Path) -> Path:
-    """Write outputs/index.html and leaf gallery pages for current artifacts."""
+    """Write the reports index, visualizations page, and leaf gallery pages."""
     out_root.mkdir(parents=True, exist_ok=True)
     assets_dir.mkdir(parents=True, exist_ok=True)
 
@@ -518,9 +532,7 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
     interactive_monthly_time_bucket_exists = (
         assets_dir / INTERACTIVE_MONTHLY_TIME_BUCKET_NAME
     ).exists()
-    interactive_daily_working_hours_name = (
-        _resolve_interactive_daily_working_hours_name(assets_dir)
-    )
+    interactive_daily_working_hours_name = _resolve_interactive_daily_working_hours_name(assets_dir)
 
     items_by_png = {
         png_name: _PlotItem(
@@ -605,7 +617,66 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
             f'<li><a href="other.html">other</a> <span class="count">({len(other)})</span></li>'
         )
 
-    html_text = """\
+    visualizations_body = _front_matter_section(
+        featured_items,
+        asset_prefix,
+        include_interactive_time_bucket=interactive_time_bucket_exists,
+        include_interactive_monthly_time_bucket=interactive_monthly_time_bucket_exists,
+        interactive_daily_working_hours_name=interactive_daily_working_hours_name,
+    )
+    if visualization_nodes:
+        gallery_tree = "\n".join(visualization_nodes)
+        visualizations_body += (
+            '<section class="visualization-galleries">\n'
+            "  <h1>Plot galleries</h1>\n"
+            f'  <ul class="tree level-0">{gallery_tree}</ul>\n'
+            "</section>\n"
+        )
+    if not visualizations_body:
+        visualizations_body = "  <p>No visualizations are available.</p>\n"
+
+    visualizations_html = Template(
+        """\
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>org-timeviz visualizations</title>
+  <style>
+    body { font-family: sans-serif; margin: 16px; max-width: 1100px; }
+    h1 { font-size: 22px; margin: 0 0 16px 0; }
+    h2 { font-size: 18px; margin: 0 0 8px 0; }
+    .plot { display: block; max-width: 100%; height: auto; margin: 8px 0 0 0; border: 1px solid #ddd; }
+    .interactive-dashboard { display: block; width: 100%; height: 1100px; margin: 8px 0 0 0; border: 1px solid #ddd; }
+    .interactive-daily-working-hours { height: 650px; }
+    .links { margin-top: 6px; }
+    .featured-gallery { margin-bottom: 28px; }
+    .gallery-item { margin: 0 0 28px 0; }
+    .visualization-galleries { margin: 28px 0; }
+    .tree { line-height: 1.7; }
+    .node-label { font-weight: 600; }
+    .count { color: #555; }
+    .page-navigation { margin: 0 0 20px 0; }
+    .page-navigation-button { display: inline-block; padding: 8px 14px; color: #fff; background: #0969da; border-radius: 6px; text-decoration: none; }
+    .page-navigation-button:hover { background: #0757b8; }
+  </style>
+</head>
+<body>
+$navigation
+$body
+</body>
+</html>
+"""
+    ).substitute(
+        navigation=_page_navigation_html(href="index.html", label="View text reports"),
+        body=visualizations_body,
+    )
+
+    visualizations_path = out_root / VISUALIZATIONS_PAGE_NAME
+    visualizations_path.write_text(visualizations_html, encoding="utf-8")
+
+    html_text = Template(
+        """\
 <!doctype html>
 <html>
 <head>
@@ -615,12 +686,9 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
     body { font-family: sans-serif; margin: 16px; max-width: 1100px; }
     h1 { font-size: 22px; margin: 0 0 16px 0; }
     h2 { font-size: 18px; margin: 0 0 8px 0; }
-    .plot { display: block; max-width: 100%%; height: auto; margin: 8px 0 0 0; border: 1px solid #ddd; }
-    .interactive-dashboard { display: block; width: 100%%; height: 1100px; margin: 8px 0 0 0; border: 1px solid #ddd; }
-    .interactive-daily-working-hours { height: 650px; }
-    .links { margin-top: 6px; }
-    .featured-gallery { margin-bottom: 28px; }
-    .gallery-item { margin: 0 0 28px 0; }
+    .page-navigation { margin: 0 0 20px 0; }
+    .page-navigation-button { display: inline-block; padding: 8px 14px; color: #fff; background: #0969da; border-radius: 6px; text-decoration: none; }
+    .page-navigation-button:hover { background: #0757b8; }
     .refresh-controls { display: flex; align-items: center; gap: 12px; margin: 0 0 20px 0; }
     .refresh-controls button { padding: 8px 14px; cursor: pointer; }
     .refresh-controls button:disabled { cursor: default; opacity: 0.6; }
@@ -643,24 +711,21 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
   </style>
 </head>
 <body>
-  %s
+  $navigation
 
-  %s
+  $refresh_controls
 
-  %s
-
+  $clock_dashboard
 </body>
 </html>
-""" % (
-        _refresh_controls_html(),
-        _clock_dashboard_html(),
-        _front_matter_section(
-            featured_items,
-            asset_prefix,
-            include_interactive_time_bucket=interactive_time_bucket_exists,
-            include_interactive_monthly_time_bucket=interactive_monthly_time_bucket_exists,
-            interactive_daily_working_hours_name=interactive_daily_working_hours_name,
+"""
+    ).substitute(
+        navigation=_page_navigation_html(
+            href=VISUALIZATIONS_PAGE_NAME,
+            label="View visualizations",
         ),
+        refresh_controls=_refresh_controls_html(),
+        clock_dashboard=_clock_dashboard_html(),
     )
 
     index_path = out_root / "index.html"
