@@ -53,7 +53,7 @@ def _stop_server(server: ThreadingHTTPServer, thread: Thread) -> None:
     thread.join(timeout=5)
 
 
-def test_generated_index_contains_refresh_controls(tmp_path: Path) -> None:
+def test_generated_index_contains_clock_dashboard_refresh(tmp_path: Path) -> None:
     output_dir = tmp_path / "outputs"
     assets_dir = output_dir / "assets"
     assets_dir.mkdir(parents=True)
@@ -61,7 +61,23 @@ def test_generated_index_contains_refresh_controls(tmp_path: Path) -> None:
     index_path = write_index_html(output_dir, assets_dir)
     text = index_path.read_text(encoding="utf-8")
 
-    assert "Refresh reports" in text
+    assert 'id="refresh-clock-dashboard"' in text
+    assert ">Refresh<" in text
+    assert 'fetch(`/clock-dashboard' in text
+    assert "Clock dashboard requires make serve." in text
+    assert 'id="refresh-reports"' not in text
+
+
+def test_generated_visualizations_page_contains_refresh_controls(tmp_path: Path) -> None:
+    output_dir = tmp_path / "outputs"
+    assets_dir = output_dir / "assets"
+    assets_dir.mkdir(parents=True)
+
+    write_index_html(output_dir, assets_dir)
+    text = (output_dir / "visualizations.html").read_text(encoding="utf-8")
+
+    assert 'id="refresh-reports"' in text
+    assert ">Refresh<" in text
     assert 'fetch("/refresh"' in text
     assert '"X-Org-Timeviz-Refresh": "1"' in text
     assert "Refresh requires make serve." in text

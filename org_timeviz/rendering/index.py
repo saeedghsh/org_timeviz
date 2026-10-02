@@ -331,7 +331,7 @@ def _refresh_controls_html() -> str:
     """Render browser controls for regenerating reports through the local server."""
     return """\
   <section class="refresh-controls">
-    <button id="refresh-reports" type="button">Refresh reports</button>
+    <button id="refresh-reports" type="button">Refresh</button>
     <span id="refresh-status" role="status"></span>
   </section>
   <script>
@@ -387,7 +387,7 @@ def _clock_dashboard_html() -> str:
     <div class="clock-dashboard-heading">
       <h1>Clock dashboard</h1>
       <div class="clock-dashboard-actions">
-        <button id="refresh-clock-dashboard" type="button">Refresh clock reports</button>
+        <button id="refresh-clock-dashboard" type="button">Refresh</button>
         <span id="clock-dashboard-status" role="status"></span>
       </div>
     </div>
@@ -659,16 +659,22 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
     .page-navigation { margin: 0 0 20px 0; }
     .page-navigation-button { display: inline-block; padding: 8px 14px; color: #fff; background: #0969da; border-radius: 6px; text-decoration: none; }
     .page-navigation-button:hover { background: #0757b8; }
+    .refresh-controls { display: flex; align-items: center; gap: 12px; margin: 0 0 20px 0; }
+    .refresh-controls button { padding: 8px 14px; cursor: pointer; }
+    .refresh-controls button:disabled { cursor: default; opacity: 0.6; }
+    #refresh-status { color: #555; }
   </style>
 </head>
 <body>
 $navigation
+$refresh_controls
 $body
 </body>
 </html>
 """
     ).substitute(
         navigation=_page_navigation_html(href="index.html", label="View text reports"),
+        refresh_controls=_refresh_controls_html(),
         body=visualizations_body,
     )
 
@@ -689,10 +695,6 @@ $body
     .page-navigation { margin: 0 0 20px 0; }
     .page-navigation-button { display: inline-block; padding: 8px 14px; color: #fff; background: #0969da; border-radius: 6px; text-decoration: none; }
     .page-navigation-button:hover { background: #0757b8; }
-    .refresh-controls { display: flex; align-items: center; gap: 12px; margin: 0 0 20px 0; }
-    .refresh-controls button { padding: 8px 14px; cursor: pointer; }
-    .refresh-controls button:disabled { cursor: default; opacity: 0.6; }
-    #refresh-status { color: #555; }
     .clock-dashboard { margin: 0 0 36px 0; }
     .clock-dashboard-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
     .clock-dashboard-actions { display: flex; align-items: center; gap: 10px; }
@@ -713,8 +715,6 @@ $body
 <body>
   $navigation
 
-  $refresh_controls
-
   $clock_dashboard
 </body>
 </html>
@@ -724,7 +724,6 @@ $body
             href=VISUALIZATIONS_PAGE_NAME,
             label="View visualizations",
         ),
-        refresh_controls=_refresh_controls_html(),
         clock_dashboard=_clock_dashboard_html(),
     )
 
