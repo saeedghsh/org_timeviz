@@ -51,6 +51,7 @@ time_buckets:
     ml_tooling_tutorial: ml_tooling_tutorial
     aim_flix: aim_flix
     msc: msc
+    msc_theses: msc
     keeper: keeper
     hh: hh
     ite: hh
