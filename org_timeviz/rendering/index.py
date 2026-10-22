@@ -10,6 +10,7 @@ from string import Template
 INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME = "interactive__time_bucket.html"
 INTERACTIVE_MONTHLY_TIME_BUCKET_NAME = "timeseries__time_bucket__month__all_time.html"
 INTERACTIVE_DAILY_WORKING_HOURS_PREFIX = "timeseries__daily_working_hours__day__"
+INTERACTIVE_TAG_TIMESERIES_NAME = "timeseries__tag__day__all_time.html"
 VISUALIZATIONS_PAGE_NAME = "visualizations.html"
 
 DEPRECATED_PNG_PREFIXES = (
@@ -200,6 +201,19 @@ def _wrap_interactive_daily_working_hours(asset_prefix: str, html_name: str) -> 
     )
 
 
+def _wrap_interactive_tag_timeseries(asset_prefix: str) -> str:
+    """Embed the raw Org tag time-series report."""
+    dashboard_href = html.escape(f"{asset_prefix}/{INTERACTIVE_TAG_TIMESERIES_NAME}")
+    return (
+        '<section class="gallery-item">\n'
+        "  <h2>timeseries__tag__day__all_time</h2>\n"
+        f'  <div class="links"><a href="{dashboard_href}">open interactive view</a></div>\n'
+        f'  <iframe class="interactive-dashboard interactive-tag-timeseries" src="{dashboard_href}" '
+        'title="Interactive Org tag time series"></iframe>\n'
+        "</section>\n"
+    )
+
+
 def _front_matter_section(
     items: Iterable[_PlotItem],
     asset_prefix: str,
@@ -207,6 +221,7 @@ def _front_matter_section(
     include_interactive_time_bucket: bool,
     include_interactive_monthly_time_bucket: bool,
     interactive_daily_working_hours_name: str | None,
+    include_interactive_tag_timeseries: bool,
 ) -> str:
     body_parts: list[str] = []
     if include_interactive_time_bucket:
@@ -220,6 +235,8 @@ def _front_matter_section(
         )
     if include_interactive_monthly_time_bucket:
         body_parts.append(_wrap_interactive_monthly_time_bucket(asset_prefix))
+    if include_interactive_tag_timeseries:
+        body_parts.append(_wrap_interactive_tag_timeseries(asset_prefix))
 
     body_parts.extend(_wrap_gallery_item(item, asset_prefix=asset_prefix) for item in items)
     if not body_parts:
@@ -533,6 +550,7 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
         assets_dir / INTERACTIVE_MONTHLY_TIME_BUCKET_NAME
     ).exists()
     interactive_daily_working_hours_name = _resolve_interactive_daily_working_hours_name(assets_dir)
+    interactive_tag_timeseries_exists = (assets_dir / INTERACTIVE_TAG_TIMESERIES_NAME).exists()
 
     items_by_png = {
         png_name: _PlotItem(
@@ -623,6 +641,7 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
         include_interactive_time_bucket=interactive_time_bucket_exists,
         include_interactive_monthly_time_bucket=interactive_monthly_time_bucket_exists,
         interactive_daily_working_hours_name=interactive_daily_working_hours_name,
+        include_interactive_tag_timeseries=interactive_tag_timeseries_exists,
     )
     if visualization_nodes:
         gallery_tree = "\n".join(visualization_nodes)
@@ -649,6 +668,7 @@ def write_index_html(out_root: Path, assets_dir: Path) -> Path:
     .plot { display: block; max-width: 100%; height: auto; margin: 8px 0 0 0; border: 1px solid #ddd; }
     .interactive-dashboard { display: block; width: 100%; height: 1100px; margin: 8px 0 0 0; border: 1px solid #ddd; }
     .interactive-daily-working-hours { height: 650px; }
+    .interactive-tag-timeseries { height: 680px; }
     .links { margin-top: 6px; }
     .featured-gallery { margin-bottom: 28px; }
     .gallery-item { margin: 0 0 28px 0; }

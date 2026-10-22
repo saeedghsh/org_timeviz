@@ -154,6 +154,10 @@ dashboard is the supported calendar view.
   is set, the filename contains that rolling date range instead of `all_time`.
 * `timeseries__time_bucket__month__all_time.html`: interactive monthly
   time-bucket trend and matching summary JSON.
+* `timeseries__tag__day__all_time.html`: interactive daily hours for a selected
+  raw Org tag, with 7/30/90-day and all-time navigation, zoom/pan, and the
+  total hours across the visible dates. Tags need not map to time buckets;
+  records with several tags contribute their full time to each matching tag.
 
 In the interactive calendar, each clocked block is colored by its dominant
 resolved time bucket after arbitration. If arbitration splits a task across

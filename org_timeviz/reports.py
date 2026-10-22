@@ -13,6 +13,7 @@ from .org_source.inputs import configure_emacs_init, resolve_org_inputs
 from .rendering.index import INTERACTIVE_TIME_BUCKET_DASHBOARD_NAME, write_index_html
 from .rendering.daily_working_hours import write_daily_working_hours_html
 from .rendering.interactive_time_bucket import write_interactive_time_bucket_dashboard
+from .rendering.tag_timeseries import write_tag_timeseries_html
 from .rendering.monthly_time_buckets import (
     compute_monthly_time_buckets,
     write_monthly_time_buckets_html,
@@ -138,6 +139,11 @@ def generate_all_reports(cfg: AppConfig) -> None:
         ),
         initial_start=initial_interactive_window.start,
         initial_end=initial_interactive_window.end,
+    )
+
+    write_tag_timeseries_html(
+        all_time_records,
+        assets_root / "timeseries__tag__day__all_time.html",
     )
 
     _LOG.info("Wrote report artifacts to %s", assets_root)
