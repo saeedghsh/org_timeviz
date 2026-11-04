@@ -146,6 +146,29 @@
   "Format interval ROW's file and heading."
   (format "%s: %s" (nth 2 row) (nth 3 row)))
 
+(defun org-timeviz-dashboard--display-key (row)
+  "Return the key ordering interval ROW within a displayed overlap pair.
+Shorter task labels sort first; the remaining fields break ties so the
+order never depends on which interval the overlap scan found first."
+  (let ((label (org-timeviz-dashboard--task-label row)))
+    (list (length label) label (nth 0 row) (nth 1 row) (if (nth 4 row) 1 0))))
+
+(defun org-timeviz-dashboard--key< (left right)
+  "Return non-nil when sort key LEFT strictly precedes sort key RIGHT."
+  (cl-loop for left-value in left
+           for right-value in right
+           unless (equal left-value right-value)
+           return (if (stringp left-value)
+                      (string< left-value right-value)
+                    (< left-value right-value))))
+
+(defun org-timeviz-dashboard--display-pair (first second)
+  "Return intervals FIRST and SECOND with the shorter task label first."
+  (if (org-timeviz-dashboard--key< (org-timeviz-dashboard--display-key second)
+                                   (org-timeviz-dashboard--display-key first))
+      (list second first)
+    (list first second)))
+
 (defun org-timeviz-dashboard--overlap-rows ()
   "Return readable rows for every pair of overlapping clock intervals."
   (let ((active '())
@@ -156,12 +179,13 @@
              (lambda (other) (<= (nth 1 other) (nth 0 row)))
              active))
       (dolist (other active)
-        (push
-         (list (org-timeviz-dashboard--task-label other)
-               (org-timeviz-dashboard--interval-label other)
-               (org-timeviz-dashboard--task-label row)
-               (org-timeviz-dashboard--interval-label row))
-         overlaps))
+        (let ((pair (org-timeviz-dashboard--display-pair other row)))
+          (push
+           (list (org-timeviz-dashboard--task-label (nth 0 pair))
+                 (org-timeviz-dashboard--interval-label (nth 0 pair))
+                 (org-timeviz-dashboard--task-label (nth 1 pair))
+                 (org-timeviz-dashboard--interval-label (nth 1 pair)))
+           overlaps)))
       (push row active))
     (nreverse overlaps)))
 

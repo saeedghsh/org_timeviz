@@ -10,6 +10,7 @@ from urllib.error import HTTPError
 from urllib.request import urlopen
 
 import pytest
+from conftest import write_dashboard_init
 
 from org_timeviz.config import AppConfig
 from org_timeviz.org_source.clock_dashboard import (
@@ -20,6 +21,8 @@ from org_timeviz.org_source.clock_dashboard import (
 )
 from org_timeviz.rendering.index import write_index_html
 from org_timeviz.server import _build_server
+
+requires_emacs = pytest.mark.skipif(shutil.which("emacs") is None, reason="Emacs is not installed")
 
 
 def _app_config(output_dir: Path, init_paths: list[Path] | None = None) -> AppConfig:
@@ -155,6 +158,74 @@ def test_render_clock_dashboard_includes_gaps_between_entries(tmp_path: Path) ->
     assert lines.index("| Second task | 10:30 | 11:00 | 0:30     |") + 1 == lines.index(
         "| Third task  | 11:00 | 11:30 | 0:30     |"
     )
+
+
+def _render_overlap_rows(tmp_path: Path, org_texts: dict[str, str]) -> list[list[str]]:
+    """Render the dashboard for temporary Org files and return overlap table rows."""
+    org_files = []
+    for name, text in org_texts.items():
+        org_file = tmp_path / name
+        org_file.write_text(text, encoding="utf-8")
+        org_files.append(org_file)
+    init_path = tmp_path / "init-org.el"
+    write_dashboard_init(init_path, org_files)
+    report = render_clock_dashboard(
+        _app_config(tmp_path / "outputs", [init_path]),
+        day=date(2026, 8, 5),
+        day_total_day=date(2026, 8, 5),
+        week_start=date(2026, 8, 3),
+    )
+    table_lines = report.suspects.split("Overlapping clocks:\n", 1)[1].splitlines()
+    return [[cell.strip() for cell in line.strip("|").split("|")] for line in table_lines[2:]]
+
+
+def _org_task(title: str, start: str, end: str) -> str:
+    return (
+        f"* {title}\n:LOGBOOK:\n"
+        f"CLOCK: [2026-08-05 Wed {start}]--[2026-08-05 Wed {end}] =>  1:00\n:END:\n"
+    )
+
+
+@requires_emacs
+def test_overlap_report_shows_shorter_task_label_first(tmp_path: Path) -> None:
+    rows = _render_overlap_rows(
+        tmp_path,
+        {
+            "a.org": _org_task("A much longer task title", "09:00", "11:00")
+            + _org_task("Short", "10:00", "12:00")
+        },
+    )
+
+    assert rows == [
+        [
+            "a.org: Short",
+            "2026-08-05 10:00--2026-08-05 12:00",
+            "a.org: A much longer task title",
+            "2026-08-05 09:00--2026-08-05 11:00",
+        ]
+    ]
+
+
+@requires_emacs
+@pytest.mark.parametrize("bravo_first", [True, False])
+def test_overlap_report_breaks_label_length_ties_independent_of_scan_order(
+    tmp_path: Path, bravo_first: bool
+) -> None:
+    alpha = ("09:30", "10:30") if bravo_first else ("09:00", "10:00")
+    bravo = ("09:00", "10:00") if bravo_first else ("09:30", "10:30")
+    rows = _render_overlap_rows(
+        tmp_path,
+        {"a.org": _org_task("Bravo", *bravo) + _org_task("Alpha", *alpha)},
+    )
+
+    assert rows == [
+        [
+            "a.org: Alpha",
+            f"2026-08-05 {alpha[0]}--2026-08-05 {alpha[1]}",
+            "a.org: Bravo",
+            f"2026-08-05 {bravo[0]}--2026-08-05 {bravo[1]}",
+        ]
+    ]
 
 
 def test_render_clock_dashboard_requires_custom_helpers(tmp_path: Path) -> None:
