@@ -39,7 +39,9 @@ When the page is served through `make serve`, a text dashboard appears above the
 plots with:
 
 * suspicious clocks across the agenda files: malformed lines, open clocks,
-  declared-duration mismatches, and overlapping intervals
+  declared-duration mismatches, and overlapping intervals. Each overlapping
+  pair shows the `file:line` of both `CLOCK:` lines for navigation; line
+  numbers change as Org files are edited, so they are display-only.
 * chronological clock entries for a selected day, including gaps between entries
 * total logged time for an independently selected day
 * total logged time for the Monday-to-Sunday week containing a selected date

@@ -200,8 +200,10 @@ def test_overlap_report_shows_shorter_task_label_first(tmp_path: Path) -> None:
         [
             "a.org: Short",
             "2026-08-05 10:00--2026-08-05 12:00",
+            "a.org:7",
             "a.org: A much longer task title",
             "2026-08-05 09:00--2026-08-05 11:00",
+            "a.org:3",
         ]
     ]
 
@@ -222,8 +224,45 @@ def test_overlap_report_breaks_label_length_ties_independent_of_scan_order(
         [
             "a.org: Alpha",
             f"2026-08-05 {alpha[0]}--2026-08-05 {alpha[1]}",
+            "a.org:7",
             "a.org: Bravo",
             f"2026-08-05 {bravo[0]}--2026-08-05 {bravo[1]}",
+            "a.org:3",
+        ]
+    ]
+
+
+@requires_emacs
+def test_overlap_report_locates_each_clock_line(tmp_path: Path) -> None:
+    rows = _render_overlap_rows(
+        tmp_path,
+        {
+            "a.org": (
+                "#+TITLE: Notes\n"
+                "\n"
+                "* Planning\n"
+                ":PROPERTIES:\n"
+                ":CATEGORY: work\n"
+                ":END:\n"
+                ":LOGBOOK:\n"
+                "CLOCK: [2026-08-04 Tue 09:00]--[2026-08-04 Tue 10:00] =>  1:00\n"
+                "CLOCK: [2026-08-05 Wed 09:00]--[2026-08-05 Wed 10:00] =>  1:00\n"
+                ":END:\n"
+                "Some notes.\n"
+            ),
+            "b.org": "* Review\n  :LOGBOOK:\n"
+            "  CLOCK: [2026-08-05 Wed 09:30]--[2026-08-05 Wed 10:30] =>  1:00\n  :END:\n",
+        },
+    )
+
+    assert rows == [
+        [
+            "b.org: Review",
+            "2026-08-05 09:30--2026-08-05 10:30",
+            "b.org:3",
+            "a.org: Planning",
+            "2026-08-05 09:00--2026-08-05 10:00",
+            "a.org:9",
         ]
     ]
 

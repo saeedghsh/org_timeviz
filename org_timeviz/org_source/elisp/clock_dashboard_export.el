@@ -96,7 +96,7 @@
        (concat
         "Overlapping clocks:\n"
         (org-timeviz-dashboard--render-table
-         '("Task A" "Interval A" "Task B" "Interval B")
+         '("Task A" "Interval A" "Location A" "Task B" "Interval B" "Location B")
          overlap-rows))
        sections))
     (if sections
@@ -104,7 +104,9 @@
       "All CLOCK lines look standard; no overlapping intervals found.")))
 
 (defun org-timeviz-dashboard--all-intervals ()
-  "Collect closed and open clock intervals from all agenda files."
+  "Collect closed and open clock intervals from all agenda files.
+Each row is (START END FILE HEADING OPEN LINE), where LINE is the
+1-based line number of the CLOCK line itself."
   (let ((rows '())
         (now (float-time (current-time))))
     (dolist (file (org-agenda-files))
@@ -113,6 +115,8 @@
           (goto-char (point-min))
           (while (re-search-forward "^ *CLOCK: *\\(.*\\)$" nil t)
             (let* ((payload (match-string 1))
+                   ;; Read the line before point moves to the owning heading.
+                   (line (line-number-at-pos (match-beginning 0) t))
                    (timestamps (my/org--collect-ts-pos payload)))
               (when (memq (length timestamps) '(1 2))
                 (let* ((start (my/org--ts->sec (caar timestamps)))
@@ -130,7 +134,8 @@
                                    end
                                    (file-name-nondirectory file)
                                    (org-get-heading t t t t)
-                                   open)
+                                   open
+                                   line)
                              rows))
                         (error nil)))))))))))
     (cl-sort rows #'< :key #'car)))
@@ -146,12 +151,17 @@
   "Format interval ROW's file and heading."
   (format "%s: %s" (nth 2 row) (nth 3 row)))
 
+(defun org-timeviz-dashboard--location-label (row)
+  "Format interval ROW's CLOCK line as FILE:LINE for navigation."
+  (format "%s:%d" (nth 2 row) (nth 5 row)))
+
 (defun org-timeviz-dashboard--display-key (row)
   "Return the key ordering interval ROW within a displayed overlap pair.
 Shorter task labels sort first; the remaining fields break ties so the
 order never depends on which interval the overlap scan found first."
   (let ((label (org-timeviz-dashboard--task-label row)))
-    (list (length label) label (nth 0 row) (nth 1 row) (if (nth 4 row) 1 0))))
+    (list (length label) label (nth 0 row) (nth 1 row) (if (nth 4 row) 1 0)
+          (nth 5 row))))
 
 (defun org-timeviz-dashboard--key< (left right)
   "Return non-nil when sort key LEFT strictly precedes sort key RIGHT."
@@ -183,8 +193,10 @@ order never depends on which interval the overlap scan found first."
           (push
            (list (org-timeviz-dashboard--task-label (nth 0 pair))
                  (org-timeviz-dashboard--interval-label (nth 0 pair))
+                 (org-timeviz-dashboard--location-label (nth 0 pair))
                  (org-timeviz-dashboard--task-label (nth 1 pair))
-                 (org-timeviz-dashboard--interval-label (nth 1 pair)))
+                 (org-timeviz-dashboard--interval-label (nth 1 pair))
+                 (org-timeviz-dashboard--location-label (nth 1 pair)))
            overlaps)))
       (push row active))
     (nreverse overlaps)))
