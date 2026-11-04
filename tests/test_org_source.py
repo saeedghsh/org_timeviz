@@ -11,7 +11,7 @@ from org_timeviz.org_source.inputs import configure_emacs_init, resolve_org_inpu
 
 
 def _app_config(**org_source_overrides: object) -> AppConfig:
-    org_sources = {
+    org_sources: dict[str, object] = {
         "mode": "explicit",
         "emacs_init_paths": [],
         "emacs_agenda_var": "org-agenda-files",

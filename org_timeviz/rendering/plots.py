@@ -105,7 +105,7 @@ def plot_timeseries_daily_total(aggs: Aggregates, out_path: Path) -> None:
     all_time_avg = _workday_average(full_values, full_days)
 
     ax.plot(
-        logged_days,  # type: ignore[arg-type]
+        logged_days,  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
         daily_values,
         color=TIMESERIES_MAIN_COLOR,
         linestyle="-",
@@ -113,7 +113,7 @@ def plot_timeseries_daily_total(aggs: Aggregates, out_path: Path) -> None:
     )
 
     ax.plot(
-        full_days,  # type: ignore[arg-type]
+        full_days,  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
         weekly_values,
         color=TIMESERIES_WEEKLY_COLOR,
         linestyle="--",
@@ -121,7 +121,7 @@ def plot_timeseries_daily_total(aggs: Aggregates, out_path: Path) -> None:
     )
 
     ax.plot(
-        full_days,  # type: ignore[arg-type]
+        full_days,  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
         monthly_values,
         color=TIMESERIES_MONTHLY_COLOR,
         linestyle="--",

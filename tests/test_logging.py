@@ -1,10 +1,14 @@
 import logging
 
+import pytest
+
 from org_timeviz.logging_utils import setup_logger
 
 
-def test_setup_logger_accepts_known_and_unknown_levels(monkeypatch) -> None:
-    calls = []
+def test_setup_logger_accepts_known_and_unknown_levels(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, object]] = []
     monkeypatch.setattr(logging, "basicConfig", lambda **kwargs: calls.append(kwargs))
     setup_logger("DEBUG")
     setup_logger("not-a-level")

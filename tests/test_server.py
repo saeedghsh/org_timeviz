@@ -12,6 +12,7 @@ from org_timeviz.overlap_approvals import APPROVALS_FILE_ENV_VAR, OverlapApprova
 from org_timeviz.rendering.index import write_index_html
 from org_timeviz.server import (
     _REFRESH_LOCK,
+    LOCAL_HOST,
     REFRESH_HEADER,
     _build_server,
     _parse_args,
@@ -48,8 +49,7 @@ def _start_server(cfg: AppConfig, output_dir: Path) -> tuple[ThreadingHTTPServer
     server = _build_server(cfg, output_dir, port=0, overlap_approvals=OverlapApprovals(None))
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    host, port = server.server_address
-    return server, thread, f"http://{host}:{port}"
+    return server, thread, f"http://{LOCAL_HOST}:{server.server_port}"
 
 
 def _stop_server(server: ThreadingHTTPServer, thread: Thread) -> None:

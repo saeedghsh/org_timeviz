@@ -1,3 +1,5 @@
+import runpy
+import sys
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -122,13 +124,12 @@ def test_generate_all_reports_orchestrates_all_current_outputs(
     monkeypatch.setattr(
         reports, "write_monthly_time_buckets_summary_json", lambda report, out_path: None
     )
-    monkeypatch.setattr(
-        reports,
-        "write_index_html",
-        lambda out_root, assets_dir: (
-            calls.append(("index", out_root / "index.html")) or out_root / "index.html"
-        ),
-    )
+
+    def write_index_html(out_root: Path, assets_dir: Path) -> Path:
+        calls.append(("index", out_root / "index.html"))
+        return out_root / "index.html"
+
+    monkeypatch.setattr(reports, "write_index_html", write_index_html)
 
     reports.generate_all_reports(cfg)
 
@@ -139,3 +140,20 @@ def test_generate_all_reports_orchestrates_all_current_outputs(
     assert kinds.count("interactive") == 1
     assert kinds.count("tag_timeseries") == 1
     assert kinds.count("index") == 1
+
+
+def test_python_m_org_timeviz_exits_with_the_cli_status(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[list[str]] = []
+
+    def fake_main(argv: list[str]) -> int:
+        seen.append(argv)
+        return 3
+
+    monkeypatch.setattr(cli, "main", fake_main)
+    monkeypatch.setattr(sys, "argv", ["org_timeviz", "--config", "custom.yaml"])
+
+    with pytest.raises(SystemExit) as exit_info:
+        runpy.run_module("org_timeviz", run_name="__main__", alter_sys=True)
+
+    assert exit_info.value.code == 3
+    assert seen == [["--config", "custom.yaml"]]

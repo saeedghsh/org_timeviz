@@ -19,6 +19,7 @@ dev = [
   "pytest>=9.0",
   "pytest-cov>=7.0",
   "ruff>=0.16",
+  "ty>=0.0.97",
   "types-PyYAML>=6.0",
 ]
 
@@ -35,12 +36,9 @@ include = ["org_timeviz*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-v --cov=org_timeviz --cov-report=term-missing"
+# `--cov` measures the `source` below and fails under `fail_under`.
+addopts = "-v -ra --strict-markers --cov --cov-report=term-missing"
 python_files = ["test_*.py"]
-filterwarnings = [
-    "ignore::DeprecationWarning",
-]
-
 
 [tool.coverage.run]
 branch = true
@@ -49,6 +47,9 @@ source = ["org_timeviz"]
 [tool.coverage.report]
 show_missing = true
 fail_under = 90
+
+[tool.coverage.html]
+directory = "output/htmlcov"
 
 [tool.ruff]
 target-version = "py312"
@@ -85,14 +86,21 @@ quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
 
+[tool.ty.src]
+exclude = ["extras", "temp"]  # local folders, as for mypy below
+
+[tool.ty.terminal]
+# Warnings, such as an unused `ty: ignore` comment, fail the check too.
+error-on-warning = true
+
 [tool.mypy]
 exclude = '^extras/|^temp/' # local folders I want to skip type checking
-ignore_missing_imports = true
 explicit_package_bases = true
+# Tests import their shared helpers as the top-level module `conftest`.
+mypy_path = "tests"
 strict = true
-warn_unused_ignores = false # Disable warnings for unused "type: ignore"
-warn_return_any = true
-disable_error_code = [
-    "type-arg", # Missing type parameters for generic type 'ndarray'
-]
-show_error_codes = true
+
+[[tool.mypy.overrides]]
+# Plotly ships neither inline types nor stubs.
+module = ["plotly", "plotly.*"]
+ignore_missing_imports = true
