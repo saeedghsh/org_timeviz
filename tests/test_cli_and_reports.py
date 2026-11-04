@@ -101,18 +101,23 @@ def test_generate_all_reports_orchestrates_all_current_outputs(
     monkeypatch.setattr(reports, "parse_org_clock_records_emacs", lambda **kwargs: records)
     monkeypatch.setattr(
         reports,
-        "plot_timeseries_daily_total",
+        "write_daily_working_hours_html",
         lambda aggs, out_path: calls.append(("timeseries", out_path)),
     )
     monkeypatch.setattr(
         reports,
-        "plot_monthly_time_buckets",
+        "write_monthly_time_buckets_html",
         lambda report, out_path: calls.append(("monthly_buckets", out_path)),
     )
     monkeypatch.setattr(
         reports,
         "write_interactive_time_bucket_dashboard",
         lambda records, out_path, **kwargs: calls.append(("interactive", out_path)),
+    )
+    monkeypatch.setattr(
+        reports,
+        "write_tag_timeseries_html",
+        lambda records, out_path: calls.append(("tag_timeseries", out_path)),
     )
     monkeypatch.setattr(reports, "write_summary_json", lambda aggs, out_path: None)
     monkeypatch.setattr(
@@ -133,4 +138,5 @@ def test_generate_all_reports_orchestrates_all_current_outputs(
     assert kinds.count("timeseries") == 1
     assert kinds.count("monthly_buckets") == 1
     assert kinds.count("interactive") == 1
+    assert kinds.count("tag_timeseries") == 1
     assert kinds.count("index") == 1
