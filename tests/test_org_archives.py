@@ -3,22 +3,25 @@
 import json
 import shutil
 import subprocess
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 
 import pytest
 
 from org_timeviz.aggregate import Aggregates, compute_aggregates
-from org_timeviz.config import TimeBucketsConfig
+from org_timeviz.config import AppConfig, TimeBucketsConfig
 from org_timeviz.filters import clip_to_window
 from org_timeviz.models import ClockRecord
 from org_timeviz.org_source import emacs as emacs_source
 from org_timeviz.org_source.emacs import parse_org_clock_records_emacs
+from org_timeviz.org_source.inputs import resolve_org_inputs
 from org_timeviz.rendering.monthly_time_buckets import (
     MonthlyTimeBuckets,
     compute_monthly_time_buckets,
 )
 from org_timeviz.rendering.tag_timeseries import compute_daily_tag_hours
+from org_timeviz.reports import generate_all_reports
 from org_timeviz.time_windows import TimeWindow
 
 requires_emacs = pytest.mark.skipif(shutil.which("emacs") is None, reason="Emacs is not installed")
@@ -62,7 +65,16 @@ CLOCK: [2026-04-05 Sun 18:00]--[2026-04-05 Sun 19:00] =>  1:00
 """
 # "Design" is a nested subtree with a child; "Client call" is a top-level task.
 ARCHIVED_HEADINGS = ("Design", "Client call")
+_BUCKET_ORDER = ["alpha", "study", "work", "other"]
+TIME_BUCKETS = {
+    "other_bucket": "other",
+    "bucket_order": _BUCKET_ORDER,
+    "tag_to_bucket": {"alpha": "alpha", "course": "study", "client": "work"},
+    "resolution": {"default_strategy": "priority", "priority_order": _BUCKET_ORDER},
+}
 EXPECTED_BUCKET_MINUTES = {"alpha": 270.0, "work": 45.0, "study": 60.0}
+# What Org leaves in an archive file once all of its entries are removed.
+EMPTY_ARCHIVE = "#    -*- mode: org -*-\n"
 
 # Each case is a real Org setup for keeping inherited tags on archived headings.
 ARCHIVE_SETUPS = {
@@ -90,15 +102,26 @@ def _isolated_emacs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 
 @pytest.fixture
 def time_buckets() -> TimeBucketsConfig:
-    order = ["alpha", "study", "work", "other"]
-    return TimeBucketsConfig.model_validate(
+    return TimeBucketsConfig.model_validate(TIME_BUCKETS)
+
+
+def _app_config(output_dir: Path, org_sources: Mapping[str, object]) -> AppConfig:
+    return AppConfig.model_validate(
         {
-            "other_bucket": "other",
-            "bucket_order": order,
-            "tag_to_bucket": {"alpha": "alpha", "course": "study", "client": "work"},
-            "resolution": {"default_strategy": "priority", "priority_order": order},
+            "app": {"output_dir": str(output_dir)},
+            "org_sources": org_sources,
+            "time_buckets": TIME_BUCKETS,
         }
     )
+
+
+def _org_sources(mode: str, org_files: list[Path], init_path: Path) -> dict[str, object]:
+    """Configure ORG_FILES explicitly or through an init file's `org-agenda-files`."""
+    if mode == "explicit":
+        return {"mode": "explicit", "explicit_files": [str(path) for path in org_files]}
+    agenda = " ".join(json.dumps(str(path)) for path in org_files)
+    init_path.write_text(f"(setq org-agenda-files '({agenda}))\n", encoding="utf-8")
+    return {"mode": "emacs", "emacs_init_paths": [str(init_path)]}
 
 
 def _archive_subtrees(org_file: Path, headings: tuple[str, ...], setup: str) -> Path:
@@ -171,12 +194,8 @@ def test_archived_clocks_keep_their_classification_and_totals(
     after = parse_org_clock_records_emacs([org_file, archive])
 
     assert len(before) == len(after) == 6
-    assert [record.headline for record in after if record.file_path == archive.resolve()] == [
-        "Design",
-        "Nested review",
-        "Nested review",
-        "Client call",
-    ]
+    archived = sorted(record.headline for record in after if record.file_path == archive.resolve())
+    assert archived == ["Client call", "Design", "Nested review", "Nested review"]
     assert _classification(after) == _classification(before)
     assert all(len(record.tags) == len(set(record.tags)) for record in after)
     assert totals_before[0].minutes_by_time_bucket == EXPECTED_BUCKET_MINUTES
@@ -234,3 +253,87 @@ def test_archived_tags_are_merged_without_repeats(tmp_path: Path) -> None:
 
     assert record.tags == ("client", "alpha", "review")
     assert record.outline_path == "Project / Area / Task"
+
+
+# Source discovery -------------------------------------------------------------
+
+
+def _output_files(output_dir: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(output_dir).as_posix(): path.read_bytes()
+        for path in sorted(output_dir.rglob("*"))
+        if path.is_file()
+    }
+
+
+@pytest.mark.parametrize("mode", ["explicit", "emacs"])
+def test_org_inputs_add_the_existing_archive_of_each_configured_file(
+    tmp_path: Path, mode: str
+) -> None:
+    plain = tmp_path / "plain.org"
+    work = tmp_path / "work.org"
+    archive = tmp_path / "work.org_archive"
+    missing = tmp_path / "missing.org"
+    # None of these is the archive of a configured file.
+    unrelated = ["other.org_archive", "work.org_archive.bak", "nested/work.org_archive"]
+    for path in [plain, work, archive, *(tmp_path / name for name in unrelated)]:
+        path.parent.mkdir(exist_ok=True)
+        path.write_text("", encoding="utf-8")
+    sources = _org_sources(mode, [plain, work, missing], tmp_path / "init.el")
+
+    inputs = resolve_org_inputs(_app_config(tmp_path / "outputs", sources))
+
+    # Files without an archive, including missing ones, are passed on as before.
+    assert inputs.org_files == [plain, work, archive, missing]
+
+
+def test_org_inputs_list_each_file_once(tmp_path: Path) -> None:
+    work = tmp_path / "work.org"
+    archive = tmp_path / "work.org_archive"
+    for path in (work, archive):
+        path.write_text("", encoding="utf-8")
+    (tmp_path / "subdir").mkdir()
+    (tmp_path / "link.org").symlink_to(work)
+    spellings = [work, archive, tmp_path / "subdir" / ".." / "work.org", tmp_path / "link.org"]
+    sources = {"mode": "explicit", "explicit_files": [str(path) for path in spellings]}
+
+    inputs = resolve_org_inputs(_app_config(tmp_path / "outputs", sources))
+
+    assert inputs.org_files == [work, archive]
+
+
+@requires_emacs
+def test_empty_archive_adds_no_records(tmp_path: Path) -> None:
+    org_file = tmp_path / "work.org"
+    org_file.write_text(WORK_ORG, encoding="utf-8")
+    archive = tmp_path / "work.org_archive"
+    archive.write_text(EMPTY_ARCHIVE, encoding="utf-8")
+    sources = _org_sources("explicit", [org_file], tmp_path / "init.el")
+
+    inputs = resolve_org_inputs(_app_config(tmp_path / "outputs", sources))
+    records = parse_org_clock_records_emacs(inputs.org_files)
+
+    assert inputs.org_files == [org_file, archive]
+    assert len(records) == 6
+    assert _classification(records) == _classification(parse_org_clock_records_emacs([org_file]))
+
+
+@requires_emacs
+@pytest.mark.parametrize("mode", ["explicit", "emacs"])
+def test_reports_are_identical_after_archiving_tasks(tmp_path: Path, mode: str) -> None:
+    org_file = tmp_path / "work.org"
+    org_file.write_text(WORK_ORG, encoding="utf-8")
+    sources = _org_sources(mode, [org_file], tmp_path / "init.el")
+    generate_all_reports(_app_config(tmp_path / "before", sources))
+
+    archive = _archive_subtrees(org_file, ARCHIVED_HEADINGS, ARCHIVE_SETUPS["archive-itags"])
+    archive_bytes = archive.read_bytes()
+    generate_all_reports(_app_config(tmp_path / "after", sources))
+
+    before = _output_files(tmp_path / "before")
+    summary = json.loads(
+        before["assets/timeseries__daily_working_hours__day__all_time__summary.json"]
+    )
+    assert summary["minutes_by_time_bucket"] == EXPECTED_BUCKET_MINUTES
+    assert _output_files(tmp_path / "after") == before
+    assert archive.read_bytes() == archive_bytes

@@ -12,7 +12,7 @@ _LOG = logging.getLogger(__name__)
 
 
 def parse_org_clock_records_emacs(org_files: list[Path]) -> list[ClockRecord]:
-    """Parse CLOCK records by calling Emacs in batch mode."""
+    """Parse CLOCK records by calling Emacs in batch mode, in chronological order."""
     script_path = Path(__file__).resolve().parent / "elisp" / "org_timeviz_export.el"
     if not script_path.exists():
         raise FileNotFoundError(f"Missing elisp exporter: {script_path}")
@@ -84,5 +84,16 @@ def parse_org_clock_records_emacs(org_files: list[Path]) -> list[ClockRecord]:
             )
         )
 
+    # Order by content, not by file, so moving a task into its archive leaves
+    # every report unchanged, including which overlapping calendar block is on top.
+    records.sort(
+        key=lambda record: (
+            record.start,
+            record.end,
+            record.outline_path,
+            record.headline,
+            record.tags,
+        )
+    )
     _LOG.info("Emacs parsed %s clock record(s)", len(records))
     return records
