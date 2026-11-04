@@ -1,6 +1,9 @@
 app:
   output_dir: outputs
   log_level: INFO
+  # Private file of approved clock overlaps, kept outside this repository.
+  # ORG_TIMEVIZ_OVERLAP_APPROVALS_FILE overrides it when set.
+  overlap_approvals_file: ~/code/orgs/timeviz/approved_overlaps.json
 
 org_sources:
   mode: emacs

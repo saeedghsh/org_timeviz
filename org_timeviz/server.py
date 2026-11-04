@@ -19,14 +19,19 @@ from urllib.parse import parse_qs, urlsplit
 from .config import AppConfig
 from .logging_utils import setup_logger
 from .org_source.clock_dashboard import render_clock_dashboard
+from .overlap_approvals import OverlapApprovalError, OverlapApprovals, OverlapPair
 from .reports import generate_all_reports
 
 _LOG = logging.getLogger(__name__)
 LOCAL_HOST = "127.0.0.1"
+LOCAL_HOST_NAMES = (LOCAL_HOST, "localhost")
 DEFAULT_PORT = 8000
 REFRESH_PATH = "/refresh"
 CLOCK_DASHBOARD_PATH = "/clock-dashboard"
+OVERLAP_APPROVALS_PATH = "/overlap-approvals"
 REFRESH_HEADER = "X-Org-Timeviz-Refresh"
+APPROVAL_HEADER = "X-Org-Timeviz-Approval"
+MAX_APPROVAL_REQUEST_BYTES = 8192
 _REFRESH_LOCK = Lock()
 
 
@@ -34,6 +39,7 @@ class ReportRequestHandler(SimpleHTTPRequestHandler):
     """Serve report artifacts and expose a local-only refresh endpoint."""
 
     config: ClassVar[AppConfig]
+    overlap_approvals: ClassVar[OverlapApprovals]
 
     def end_headers(self) -> None:
         """Disable browser caching so regenerated artifacts are fetched immediately."""
@@ -58,14 +64,17 @@ class ReportRequestHandler(SimpleHTTPRequestHandler):
             )
             week_anchor = date.fromisoformat(query.get("week_date", [today.isoformat()])[0])
             week_start = week_anchor - timedelta(days=week_anchor.weekday())
-            payload = asdict(
-                render_clock_dashboard(
-                    self.config,
-                    day=day,
-                    day_total_day=day_total_day,
-                    week_start=week_start,
-                )
+            dashboard = render_clock_dashboard(
+                self.config,
+                day=day,
+                day_total_day=day_total_day,
+                week_start=week_start,
             )
+            review = self.overlap_approvals.review(dashboard.overlaps)
+            payload = asdict(dashboard) | {
+                "overlaps": [overlap.to_json() for overlap in review.overlaps],
+                "overlap_approvals": {"enabled": review.enabled, "message": review.message},
+            }
         except (ValueError, IndexError):
             self.send_error(HTTPStatus.BAD_REQUEST, "Invalid dashboard date or week.")
             return
@@ -77,15 +86,22 @@ class ReportRequestHandler(SimpleHTTPRequestHandler):
             )
             return
 
+        self._write_json(HTTPStatus.OK, payload)
+
+    def _write_json(self, status: HTTPStatus, payload: object) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.send_response(HTTPStatus.OK)
+        self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
     def do_POST(self) -> None:
-        """Regenerate reports when the index refresh control is used."""
+        """Regenerate reports or change an overlap approval."""
+        if self.path == OVERLAP_APPROVALS_PATH:
+            self._update_overlap_approval()
+            return
+
         if self.path != REFRESH_PATH:
             self.send_error(HTTPStatus.NOT_FOUND)
             return
@@ -113,6 +129,52 @@ class ReportRequestHandler(SimpleHTTPRequestHandler):
         self.send_response(HTTPStatus.NO_CONTENT)
         self.end_headers()
 
+    def _update_overlap_approval(self) -> None:
+        """Approve or unapprove one detected overlap pair from a JSON request."""
+        host_name = urlsplit(f"//{self.headers.get('Host', '')}").hostname
+        # The custom header forces a CORS preflight; the Host check defeats DNS rebinding.
+        if self.headers.get(APPROVAL_HEADER) != "1" or host_name not in LOCAL_HOST_NAMES:
+            self._write_json(HTTPStatus.FORBIDDEN, {"error": "Request is not from the dashboard."})
+            return
+        if self.headers.get_content_type() != "application/json":
+            self._write_json(
+                HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "Expected an application/json body."}
+            )
+            return
+        try:
+            length = int(self.headers.get("Content-Length", ""))
+        except ValueError:
+            self._write_json(HTTPStatus.LENGTH_REQUIRED, {"error": "Content-Length is required."})
+            return
+        if not 0 <= length <= MAX_APPROVAL_REQUEST_BYTES:
+            self._write_json(
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "Request body is too large."}
+            )
+            return
+
+        try:
+            approved, pair = _parse_approval_request(json.loads(self.rfile.read(length)))
+        except (UnicodeDecodeError, ValueError) as error:
+            self._write_json(HTTPStatus.BAD_REQUEST, {"error": f"Invalid request: {error}"})
+            return
+
+        try:
+            self.overlap_approvals.set_approved(pair, approved)
+        except OverlapApprovalError as error:
+            self._write_json(HTTPStatus.CONFLICT, {"error": str(error)})
+            return
+        _LOG.info("%s overlap %s", "Approved" if approved else "Unapproved", pair.to_json())
+        self._write_json(HTTPStatus.OK, {"pair": pair.to_json(), "approved": approved})
+
+
+def _parse_approval_request(value: object) -> tuple[bool, OverlapPair]:
+    """Validate an approval request and return whether to approve, and the pair."""
+    if not isinstance(value, dict) or set(value) != {"action", "pair"}:
+        raise ValueError("expected a JSON object with exactly 'action' and 'pair'")
+    if value["action"] not in ("approve", "unapprove"):
+        raise ValueError("action must be 'approve' or 'unapprove'")
+    return value["action"] == "approve", OverlapPair.from_json(value["pair"])
+
 
 def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -134,9 +196,15 @@ def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _build_server(cfg: AppConfig, output_dir: Path, port: int) -> ThreadingHTTPServer:
+def _build_server(
+    cfg: AppConfig,
+    output_dir: Path,
+    port: int,
+    overlap_approvals: OverlapApprovals,
+) -> ThreadingHTTPServer:
     """Build a localhost-only HTTP server rooted at the report output directory."""
     ReportRequestHandler.config = cfg
+    ReportRequestHandler.overlap_approvals = overlap_approvals
     handler = partial(ReportRequestHandler, directory=str(output_dir))
     return ThreadingHTTPServer((LOCAL_HOST, port), handler)
 
@@ -148,7 +216,13 @@ def serve_reports(cfg: AppConfig, port: int = DEFAULT_PORT) -> None:
     output_dir = Path(cfg.app.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    with _build_server(cfg, output_dir, port) as server:
+    overlap_approvals = OverlapApprovals.from_settings(cfg.app.overlap_approvals_file, os.environ)
+    if overlap_approvals.store_path is None:
+        _LOG.warning("%s", overlap_approvals.disabled_message)
+    else:
+        _LOG.info("Overlap approvals are stored in %s", overlap_approvals.store_path)
+
+    with _build_server(cfg, output_dir, port, overlap_approvals) as server:
         actual_port = server.server_address[1]
         _LOG.info("Serving reports at http://%s:%s/", LOCAL_HOST, actual_port)
         _LOG.info("Press Ctrl-C to stop the report server")

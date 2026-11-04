@@ -20,10 +20,7 @@ def _base_time_buckets() -> dict[str, object]:
     }
 
 
-def test_app_config_loads_yaml(tmp_path: Path) -> None:
-    path = tmp_path / "config.yaml"
-    path.write_text(
-        """
+_MINIMAL_TIME_BUCKETS_YAML = """
 time_buckets:
   other_bucket: other
   bucket_order: [work, other]
@@ -31,14 +28,30 @@ time_buckets:
   resolution:
     default_strategy: priority
     priority_order: [work, other]
-""",
-        encoding="utf-8",
-    )
+"""
+
+
+def test_app_config_loads_yaml(tmp_path: Path) -> None:
+    path = tmp_path / "config.yaml"
+    path.write_text(_MINIMAL_TIME_BUCKETS_YAML, encoding="utf-8")
     cfg = AppConfig.from_yaml(path)
     assert cfg.app.output_dir == "outputs"
+    assert cfg.app.overlap_approvals_file is None
     assert cfg.reports.plots.timeseries_last_n_days is None
     assert cfg.reports.plots.calendar_view_by_time_bucket.low_opacity_task_titles == []
     assert cfg.time_buckets.tag_to_bucket == {"job": "work"}
+
+
+def test_app_config_reads_unquoted_home_relative_approvals_file(tmp_path: Path) -> None:
+    path = tmp_path / "config.yaml"
+    path.write_text(
+        "app:\n  overlap_approvals_file: ~/orgs/timeviz/approved_overlaps.json\n"
+        + _MINIMAL_TIME_BUCKETS_YAML,
+        encoding="utf-8",
+    )
+    cfg = AppConfig.from_yaml(path)
+    # A bare `~` would be YAML null; a `~/` prefix must stay a string to be expanded later.
+    assert cfg.app.overlap_approvals_file == "~/orgs/timeviz/approved_overlaps.json"
 
 
 def test_duplicate_low_opacity_task_titles_are_rejected() -> None:
