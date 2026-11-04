@@ -320,7 +320,7 @@ def _bucket_hours_for_interval(
     end: datetime,
 ) -> list[float]:
     """Return fixed-order bucket hours clipped to one visible interval."""
-    totals = {bucket_name: 0.0 for bucket_name in bucket_order}
+    totals = dict.fromkeys(bucket_order, 0.0)
 
     for record in records:
         overlap_start = max(record.start, start)

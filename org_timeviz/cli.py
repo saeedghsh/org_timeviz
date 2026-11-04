@@ -4,8 +4,8 @@ import argparse
 import logging
 import os
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 from .config import AppConfig
 from .logging_utils import setup_logger

@@ -11,7 +11,6 @@ from plotly.offline import get_plotlyjs
 
 from ..filters import ClippedRecord
 
-
 TAG_TIMESERIES_HEIGHT = 580
 
 
@@ -26,9 +25,7 @@ def compute_daily_tag_hours(records: Iterable[ClippedRecord]) -> dict[str, dict[
 
         current = record.start
         while current < record.end:
-            next_day = datetime.combine(
-                current.date() + timedelta(days=1), datetime.min.time()
-            )
+            next_day = datetime.combine(current.date() + timedelta(days=1), datetime.min.time())
             segment_end = min(record.end, next_day)
             hours = (segment_end - current).total_seconds() / 3600.0
             day_label = current.date().isoformat()
@@ -36,10 +33,7 @@ def compute_daily_tag_hours(records: Iterable[ClippedRecord]) -> dict[str, dict[
                 hours_by_tag[tag][day_label] += hours
             current = segment_end
 
-    return {
-        tag: dict(sorted(day_hours.items()))
-        for tag, day_hours in sorted(hours_by_tag.items())
-    }
+    return {tag: dict(sorted(day_hours.items())) for tag, day_hours in sorted(hours_by_tag.items())}
 
 
 def write_tag_timeseries_html(records: Iterable[ClippedRecord], out_path: Path) -> None:

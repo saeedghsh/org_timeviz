@@ -278,12 +278,12 @@ def test_empty_monthly_and_timeseries_plots_are_still_valid_files(
     monthly = compute_monthly_time_buckets([], bucket_cfg)
     monthly_html = tmp_path / "empty-monthly.html"
     write_monthly_time_buckets_html(monthly, monthly_html)
-    assert monthly_html.exists() and monthly_html.stat().st_size > 0
+    assert monthly_html.stat().st_size > 0
 
     empty_aggs = compute_aggregates([], bucket_cfg)
     daily_html = tmp_path / "empty-daily.html"
     write_daily_working_hours_html(empty_aggs, daily_html)
-    assert daily_html.exists() and daily_html.stat().st_size > 0
+    assert daily_html.stat().st_size > 0
 
 
 def test_index_routes_unparsed_pngs_to_other_gallery(tmp_path: Path) -> None:

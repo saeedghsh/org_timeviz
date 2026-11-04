@@ -11,8 +11,8 @@ from org_timeviz.config import AppConfig
 from org_timeviz.overlap_approvals import APPROVALS_FILE_ENV_VAR, OverlapApprovals
 from org_timeviz.rendering.index import write_index_html
 from org_timeviz.server import (
-    REFRESH_HEADER,
     _REFRESH_LOCK,
+    REFRESH_HEADER,
     _build_server,
     _parse_args,
     main,
@@ -68,7 +68,7 @@ def test_generated_index_contains_clock_dashboard_refresh(tmp_path: Path) -> Non
 
     assert 'id="refresh-clock-dashboard"' in text
     assert ">Refresh<" in text
-    assert 'fetch(`/clock-dashboard' in text
+    assert "fetch(`/clock-dashboard" in text
     assert "Clock dashboard requires make serve." in text
     assert 'id="refresh-reports"' not in text
 
@@ -196,12 +196,14 @@ def test_refresh_endpoint_reports_generation_failure(tmp_path: Path) -> None:
     )
 
     try:
-        with patch(
-            "org_timeviz.server.generate_all_reports",
-            side_effect=RuntimeError("boom"),
+        with (
+            patch(
+                "org_timeviz.server.generate_all_reports",
+                side_effect=RuntimeError("boom"),
+            ),
+            pytest.raises(HTTPError) as error,
         ):
-            with pytest.raises(HTTPError) as error:
-                urlopen(request)
+            urlopen(request)
         assert error.value.code == 500
     finally:
         _stop_server(server, thread)

@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+from conftest import make_clipped, make_record
 
 from org_timeviz import other_catalogue
 from org_timeviz.config import AppConfig
@@ -13,8 +14,6 @@ from org_timeviz.other_catalogue import (
     _write_other_catalogue_csv,
     generate_other_catalogue,
 )
-
-from conftest import make_clipped, make_record
 
 
 def _cfg(tmp_path: Path) -> AppConfig:

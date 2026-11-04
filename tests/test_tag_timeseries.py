@@ -39,12 +39,8 @@ def test_tag_hours_split_days_and_keep_raw_tags() -> None:
     ]
 
     hours = compute_daily_tag_hours(records)
-    assert hours["msc_theses"] == pytest.approx(
-        {"2026-01-01": 0.5, "2026-01-02": 2.5}
-    )
-    assert hours["unmapped"] == pytest.approx(
-        {"2026-01-01": 0.5, "2026-01-02": 0.5}
-    )
+    assert hours["msc_theses"] == pytest.approx({"2026-01-01": 0.5, "2026-01-02": 2.5})
+    assert hours["unmapped"] == pytest.approx({"2026-01-01": 0.5, "2026-01-02": 0.5})
 
 
 def test_tag_html_contains_controls_and_embedded_data(tmp_path: Path) -> None:
@@ -63,19 +59,17 @@ def test_tag_html_contains_controls_and_embedded_data(tmp_path: Path) -> None:
     assert 'id="tag-total"' in text
     assert '"arbitrary_tag": {"2026-01-02": 1.0}' in text
     assert 'plot.on("plotly_relayout"' in text
-    assert 'Plotly.restyle' in text
+    assert "Plotly.restyle" in text
 
 
 def test_visualizations_embed_tag_report_without_changing_index(tmp_path: Path) -> None:
     assets = tmp_path / "assets"
     assets.mkdir()
-    (assets / "timeseries__tag__day__all_time.html").write_text(
-        "report", encoding="utf-8"
-    )
+    (assets / "timeseries__tag__day__all_time.html").write_text("report", encoding="utf-8")
     write_index_html(tmp_path, assets)
 
     visualizations = (tmp_path / "visualizations.html").read_text(encoding="utf-8")
     index = (tmp_path / "index.html").read_text(encoding="utf-8")
-    assert 'interactive-tag-timeseries' in visualizations
-    assert 'timeseries__tag__day__all_time.html' in visualizations
-    assert 'timeseries__tag__day__all_time.html' not in index
+    assert "interactive-tag-timeseries" in visualizations
+    assert "timeseries__tag__day__all_time.html" in visualizations
+    assert "timeseries__tag__day__all_time.html" not in index

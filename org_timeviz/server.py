@@ -59,9 +59,7 @@ class ReportRequestHandler(SimpleHTTPRequestHandler):
         try:
             today = date.today()
             day = date.fromisoformat(query.get("date", [today.isoformat()])[0])
-            day_total_day = date.fromisoformat(
-                query.get("day_total_date", [today.isoformat()])[0]
-            )
+            day_total_day = date.fromisoformat(query.get("day_total_date", [today.isoformat()])[0])
             week_anchor = date.fromisoformat(query.get("week_date", [today.isoformat()])[0])
             week_start = week_anchor - timedelta(days=week_anchor.weekday())
             dashboard = render_clock_dashboard(

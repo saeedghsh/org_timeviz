@@ -331,9 +331,11 @@ def test_store_reports_unwritable_location(tmp_path: Path) -> None:
 
 
 def test_store_cleans_up_after_failed_replace(approvals_path: Path) -> None:
-    with patch("org_timeviz.overlap_approvals.os.replace", side_effect=OSError("disk full")):
-        with pytest.raises(ApprovalStoreError, match="disk full"):
-            ApprovalStore(approvals_path).set_approved(VACATION_FIX_PAIR, True)
+    with (
+        patch.object(Path, "replace", side_effect=OSError("disk full")),
+        pytest.raises(ApprovalStoreError, match="disk full"),
+    ):
+        ApprovalStore(approvals_path).set_approved(VACATION_FIX_PAIR, True)
     assert list(approvals_path.parent.iterdir()) == []
 
 
@@ -381,7 +383,8 @@ def test_approvals_are_disabled_without_an_absolute_configured_path(
     review = approvals.review([VACATION_FIX])
 
     assert approvals.store_path is None
-    assert approvals.disabled_message is not None and message in approvals.disabled_message
+    assert approvals.disabled_message is not None
+    assert message in approvals.disabled_message
     assert (review.enabled, review.message) == (False, approvals.disabled_message)
     assert review.overlaps[0].status == "unapproved"
     with pytest.raises(OverlapApprovalError, match=message):
@@ -409,7 +412,8 @@ def test_directory_as_approvals_file_disables_approvals_safely(tmp_path: Path) -
     review = approvals.review([VACATION_FIX])
 
     assert review.enabled is False
-    assert review.message is not None and "Could not read" in review.message
+    assert review.message is not None
+    assert "Could not read" in review.message
     assert review.overlaps[0].status == "unapproved"
     with pytest.raises(OverlapApprovalError, match="Could not read"):
         approvals.set_approved(VACATION_FIX_PAIR, False)

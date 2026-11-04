@@ -3,11 +3,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from conftest import make_record
 
 from org_timeviz import cli, reports
 from org_timeviz.config import AppConfig
-
-from conftest import make_record
 
 
 def _cfg(tmp_path: Path) -> AppConfig:
