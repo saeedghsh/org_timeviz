@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Superseded pull-request runs are cancelled; every push to master is checked.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  code-quality:
+    name: Code quality
+    # Ubuntu 26.04 packages Emacs 30, the series the exporters are developed with.
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # `make elisp-check` needs Emacs, so it fails here rather than letting
+      # the Emacs integration tests skip themselves.
+      - name: Install Emacs
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends emacs-nox
+          emacs --version
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.7"
+          enable-cache: true
+          cache-python: true
+
+      - name: Install dependencies from uv.lock
+        run: uv sync --locked
+
+      - name: Run all checks
+        run: make code-quality

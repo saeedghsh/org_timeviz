@@ -472,6 +472,14 @@ ty is the faster type checker, but it does not yet enforce annotations or
 report everything mypy's strict mode does, such as `bytes` interpolated into an
 f-string, so both run.
 
+### Continuous integration
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on pushes and pull requests to
+`master`, and on demand. On Ubuntu 26.04 it installs Emacs and uv, installs the
+locked dependencies with `uv sync --locked`, and runs `make code-quality`, so CI
+and local runs perform the same checks. It needs no secrets, private
+repositories, or personal Org and Emacs files.
+
 ## License
 
 Distributed with a GNU GENERAL PUBLIC LICENSE; see LICENSE.
