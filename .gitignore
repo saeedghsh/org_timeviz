@@ -1,7 +1,6 @@
 __pycache__/
 *.pyc
 .venv/
-.conda/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
@@ -12,3 +11,7 @@ __pycache__/
 *~
 
 outputs/
+
+*.egg-info/
+build/
+output/

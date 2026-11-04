@@ -430,6 +430,26 @@ time_buckets:
 In practice, this lets you keep tags semantically honest while still producing a
 clear and configurable reporting view of time allocation.
 
+## Development
+
+The Python environment is managed with [uv](https://docs.astral.sh/uv/). Install
+it once, for example with `curl -LsSf https://astral.sh/uv/install.sh | sh`
+(see the uv documentation for other methods), then:
+
+```bash
+make sync    # create .venv from uv.lock, including the development tools
+make run     # or: make serve, make other_catalogue
+```
+
+uv provides the Python version pinned in `.python-version` (3.12) if it is not
+installed. Every `make` target runs through `uv run --locked`, which creates or
+updates `.venv` as needed and fails instead of rewriting `uv.lock` when it no
+longer matches `pyproject.toml`. After changing dependencies, run `uv lock` and
+commit the updated `uv.lock`.
+
+Emacs must be on `PATH`: reports and the live dashboard read Org files through
+Emacs in batch mode.
+
 ## License
 
 Distributed with a GNU GENERAL PUBLIC LICENSE; see LICENSE.
