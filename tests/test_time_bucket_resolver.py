@@ -78,3 +78,39 @@ def test_priority_falls_back_to_configured_bucket_order_when_priority_omits_matc
         }
     )
     assert resolve_time_bucket_allocations(("x", "y"), cfg) == {"a": 1.0}
+
+
+@pytest.mark.parametrize(
+    ("tags", "expected"),
+    [
+        # Neither rule applies: the first lacks tag `z`, the second bucket `c`.
+        (("x", "y"), {"b": 1.0}),
+        # Only the second rule's buckets are present.
+        (("x", "z"), {"a": 0.5, "c": 0.5}),
+        # The first rule wins once all of its tags are present.
+        (("x", "y", "z"), {"a": 0.25, "b": 0.25, "c": 0.5}),
+    ],
+)
+def test_rules_apply_only_when_all_their_tags_and_buckets_match(
+    tags: tuple[str, ...], expected: dict[str, float]
+) -> None:
+    cfg = TimeBucketsConfig.model_validate(
+        {
+            "other_bucket": "other",
+            "bucket_order": ["a", "b", "c", "other"],
+            "tag_to_bucket": {"x": "a", "y": "b", "z": "c"},
+            "resolution": {
+                "default_strategy": "priority",
+                "priority_order": ["b", "a", "c", "other"],
+                "rules": [
+                    {
+                        "match_all_tags": ["x", "y", "z"],
+                        "strategy": "split_weighted",
+                        "weights": {"c": 2},
+                    },
+                    {"match_all_buckets": ["a", "c"], "strategy": "split_weighted"},
+                ],
+            },
+        }
+    )
+    assert resolve_time_bucket_allocations(tags, cfg) == pytest.approx(expected)

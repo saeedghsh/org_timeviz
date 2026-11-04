@@ -6,6 +6,14 @@
 (require 'org)
 (require 'org-id)
 
+;; Defined by the user's Emacs init file, which is loaded before this script.
+(declare-function my/org-clock-suspects "ext:init-org" (files))
+(declare-function my/org--collect-ts-pos "ext:init-org" (s))
+(declare-function my/org--ts->sec "ext:init-org" (ts))
+(declare-function my/org-clocklog-rows "ext:init-org" (&optional date-str files))
+(declare-function my/org-clocklog--fmt-hhmm "ext:init-org" (sec))
+(declare-function my/org-clocklog--fmt-dur "ext:init-org" (mins))
+
 ;; The user's init-org.el resolves dangling clocks whenever an Org buffer opens.
 ;; Dashboard reads must never mutate source Org files.
 (when (boundp 'my/org-auto-resolve-dangling-clocks)

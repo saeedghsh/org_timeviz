@@ -23,7 +23,7 @@ from org_timeviz.org_source.clock_dashboard import (
 )
 from org_timeviz.overlap_approvals import OverlapApprovals
 from org_timeviz.rendering.index import write_index_html
-from org_timeviz.server import _build_server
+from org_timeviz.server import LOCAL_HOST, _build_server
 
 requires_emacs = pytest.mark.skipif(shutil.which("emacs") is None, reason="Emacs is not installed")
 
@@ -76,8 +76,7 @@ def _start_server(cfg: AppConfig, output_dir: Path) -> tuple[ThreadingHTTPServer
     server = _build_server(cfg, output_dir, port=0, overlap_approvals=OverlapApprovals(None))
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    host, port = server.server_address
-    return server, thread, f"http://{host}:{port}"
+    return server, thread, f"http://{LOCAL_HOST}:{server.server_port}"
 
 
 def _stop_server(server: ThreadingHTTPServer, thread: Thread) -> None:

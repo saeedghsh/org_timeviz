@@ -88,6 +88,36 @@ def test_generate_other_catalogue_writes_header_for_no_records(
     assert path.read_text(encoding="utf-8") == "tag,hours\n"
 
 
+def test_generate_other_catalogue_applies_report_filters_over_all_records(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cfg = _cfg(tmp_path)
+    cfg.reports.filters.exclude_tags = ["private"]
+    records = [
+        make_record(start=datetime(2026, 1, 1, 9), end=datetime(2026, 1, 1, 10), tags=("hobby",)),
+        make_record(start=datetime(2026, 3, 2, 9), end=datetime(2026, 3, 2, 11), tags=("chore",)),
+        make_record(start=datetime(2026, 2, 1, 9), end=datetime(2026, 2, 1, 12), tags=("job",)),
+        make_record(
+            start=datetime(2026, 2, 2, 9), end=datetime(2026, 2, 2, 13), tags=("hobby", "private")
+        ),
+    ]
+    monkeypatch.setattr(
+        "org_timeviz.other_catalogue.resolve_org_inputs",
+        lambda cfg: type("I", (), {"org_files": [], "agenda_init_path": None})(),
+    )
+    monkeypatch.setattr("org_timeviz.other_catalogue.configure_emacs_init", lambda *args: None)
+    monkeypatch.setattr(
+        "org_timeviz.other_catalogue.parse_org_clock_records_emacs", lambda **kwargs: records
+    )
+
+    path = generate_other_catalogue(cfg)
+
+    # Mapped `job` time and the excluded `private` record are left out; the
+    # rest of the full date range is kept, largest first.
+    with path.open(newline="", encoding="utf-8") as handle:
+        assert list(csv.reader(handle)) == [["tag", "hours"], ["chore", "2.00"], ["hobby", "1.00"]]
+
+
 def test_main_writes_catalogue_and_exits_successfully(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

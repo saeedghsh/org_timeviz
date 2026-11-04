@@ -33,15 +33,19 @@ other_catalogue: ## Write CSV of unmapped tags contributing to the other time bu
 ########################################
 ################### CODE QUALITY TARGETS
 ########################################
+EMACS ?= emacs
+ELISP_FILES = $(wildcard org_timeviz/org_source/elisp/*.el)
+
 .PHONY: test
-test:
+test: ## Run the tests, failing below the configured coverage threshold.
 	@echo "\n=== Running tests ==="
-	@$(UV_RUN) pytest --cov=. --cov-report html:output/htmlcov
+	@$(UV_RUN) pytest
 
 .PHONY: coverage
-coverage:
+coverage: ## Report coverage of the last test run, also as HTML in output/htmlcov.
 	@echo "\n=== Generating coverage report ==="
-	@$(UV_RUN) coverage report -m
+	@$(UV_RUN) coverage report
+	@$(UV_RUN) coverage html
 
 .PHONY: format
 format: ## Format Python code with Ruff.
@@ -68,14 +72,23 @@ lint-fix: ## Apply Ruff's safe automatic lint fixes.
 formatter: format-check
 linter: lint
 
+# ty is fast but does not yet enforce annotations or match all of mypy's
+# strict checks, so mypy keeps running in strict mode alongside it.
 .PHONY: type-check
-type-check: ## Run static type checking.
-	@echo "\n=== Running type checks (all) ==="
+type-check: ## Type-check with ty and with mypy in strict mode.
+	@echo "\n=== Running type checks ==="
+	@$(UV_RUN) ty check
 	@$(UV_RUN) mypy .
 
+.PHONY: elisp-check
+elisp-check: ## Byte-compile the Emacs Lisp exporters, treating warnings as errors.
+	@echo "\n=== Checking Emacs Lisp ==="
+	@$(EMACS) --batch -Q --load scripts/check-elisp.el $(ELISP_FILES)
+
 .PHONY: code-quality
-code-quality: ## Run formatting, linting, typing, and unit tests.
+code-quality: ## Run every non-mutating check: format, lint, types, Emacs Lisp, tests.
 	@$(MAKE) format-check
 	@$(MAKE) lint
 	@$(MAKE) type-check
+	@$(MAKE) elisp-check
 	@$(MAKE) test

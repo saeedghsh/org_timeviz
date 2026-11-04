@@ -450,6 +450,28 @@ commit the updated `uv.lock`.
 Emacs must be on `PATH`: reports and the live dashboard read Org files through
 Emacs in batch mode.
 
+### Quality checks
+
+```bash
+make format         # apply Ruff formatting
+make format-check   # verify formatting without changing files
+make lint           # Ruff lint rules
+make lint-fix       # apply Ruff's safe automatic fixes
+make type-check     # ty, then mypy in strict mode
+make elisp-check    # byte-compile the Emacs Lisp exporters, warnings as errors
+make test           # pytest, failing below 90% coverage of org_timeviz
+make coverage       # report the last test run, also as HTML in output/htmlcov
+make code-quality   # every non-mutating check above, stopping at the first failure
+```
+
+The tests use temporary, synthetic Org files and Emacs init files, never your
+own. Tests that run Emacs are skipped when it is not installed; `make
+code-quality` still requires Emacs because `make elisp-check` runs it.
+
+ty is the faster type checker, but it does not yet enforce annotations or
+report everything mypy's strict mode does, such as `bytes` interpolated into an
+f-string, so both run.
+
 ## License
 
 Distributed with a GNU GENERAL PUBLIC LICENSE; see LICENSE.
