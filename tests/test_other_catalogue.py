@@ -1,9 +1,11 @@
 import csv
+import os
 from datetime import datetime
 from pathlib import Path
 
 import pytest
 
+from org_timeviz import other_catalogue
 from org_timeviz.config import AppConfig
 from org_timeviz.other_catalogue import (
     NO_TAG_LABEL,
@@ -85,3 +87,23 @@ def test_generate_other_catalogue_writes_header_for_no_records(
     )
     path = generate_other_catalogue(cfg)
     assert path.read_text(encoding="utf-8") == "tag,hours\n"
+
+
+def test_main_writes_catalogue_and_exits_successfully(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # `configure_emacs_init` edits these; register them so the test restores them.
+    monkeypatch.delenv("ORG_TIMEVIZ_EMACS_INIT", raising=False)
+    monkeypatch.delenv("ORG_TIMEVIZ_TODO_KEYWORDS", raising=False)
+    monkeypatch.setattr(other_catalogue, "setup_logger", lambda level: None)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        f"app:\n  output_dir: {tmp_path / 'outputs'}\n"
+        "org_sources:\n  mode: explicit\n  explicit_files: []\n  emacs_init_paths: []\n"
+        "time_buckets:\n  other_bucket: other\n  bucket_order: [other]\n  tag_to_bucket: {}\n"
+        "  resolution:\n    default_strategy: priority\n    priority_order: [other]\n",
+        encoding="utf-8",
+    )
+
+    assert other_catalogue._main(["--config", str(config_path)]) == os.EX_OK
+    assert (tmp_path / "outputs" / "other_catalogue.csv").is_file()
