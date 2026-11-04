@@ -21,6 +21,7 @@ from org_timeviz.org_source.clock_dashboard import ClockDashboard, ClockOverlap,
 from org_timeviz.org_source.emacs import parse_org_clock_records_emacs
 from org_timeviz.overlap_approvals import (
     APPROVALS_FILE_ENV_VAR,
+    APPROVALS_FILE_SETTING,
     ApprovalStore,
     ApprovalStoreError,
     ClockIdentity,
@@ -333,19 +334,45 @@ def test_store_cleans_up_after_failed_replace(approvals_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("value", "message"),
+    ("environment_file", "configured_file", "expected"),
     [
-        (None, f"Set {APPROVALS_FILE_ENV_VAR}"),
-        ("   ", f"Set {APPROVALS_FILE_ENV_VAR}"),
-        ("relative/approved.json", "must be an absolute path"),
+        ("/env/approved.json", "/yaml/approved.json", Path("/env/approved.json")),
+        ("/env/approved.json", None, Path("/env/approved.json")),
+        (None, "/yaml/approved.json", Path("/yaml/approved.json")),
+        ("  ", "/yaml/approved.json", Path("/yaml/approved.json")),
+    ],
+)
+def test_environment_variable_overrides_configured_approvals_file(
+    environment_file: str | None, configured_file: str | None, expected: Path
+) -> None:
+    environ = {} if environment_file is None else {APPROVALS_FILE_ENV_VAR: environment_file}
+
+    approvals = OverlapApprovals.from_settings(configured_file, environ)
+
+    assert approvals.store_path == expected
+    assert approvals.disabled_message is None
+
+
+_RELATIVE_PATH = "must be an absolute path"
+
+
+@pytest.mark.parametrize(
+    ("environment_file", "configured_file", "message"),
+    [
+        (None, None, f"Set {APPROVALS_FILE_SETTING}"),
+        ("   ", "  ", f"Set {APPROVALS_FILE_SETTING}"),
+        ("relative/approved.json", None, f"{APPROVALS_FILE_ENV_VAR} {_RELATIVE_PATH}"),
+        (None, "relative/approved.json", f"{APPROVALS_FILE_SETTING} {_RELATIVE_PATH}"),
+        (None, "~no-such-org-timeviz-user/approved.json", _RELATIVE_PATH),
+        # An invalid override is reported rather than silently replaced by the YAML path.
+        ("relative/approved.json", "/yaml/approved.json", APPROVALS_FILE_ENV_VAR),
     ],
 )
 def test_approvals_are_disabled_without_an_absolute_configured_path(
-    value: str | None, message: str
+    environment_file: str | None, configured_file: str | None, message: str
 ) -> None:
-    approvals = OverlapApprovals.from_environment(
-        {} if value is None else {APPROVALS_FILE_ENV_VAR: value}
-    )
+    environ = {} if environment_file is None else {APPROVALS_FILE_ENV_VAR: environment_file}
+    approvals = OverlapApprovals.from_settings(configured_file, environ)
 
     review = approvals.review([VACATION_FIX])
 
@@ -357,15 +384,32 @@ def test_approvals_are_disabled_without_an_absolute_configured_path(
         approvals.set_approved(VACATION_FIX_PAIR, True)
 
 
+@pytest.mark.parametrize("from_environment", [True, False])
 def test_approvals_expand_home_in_configured_path(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, from_environment: bool
 ) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
+    environ = {APPROVALS_FILE_ENV_VAR: "~/orgs/a.json"} if from_environment else {}
 
-    approvals = OverlapApprovals.from_environment({APPROVALS_FILE_ENV_VAR: "~/orgs/a.json"})
+    approvals = OverlapApprovals.from_settings(
+        None if from_environment else "~/orgs/a.json", environ
+    )
 
     assert approvals.store_path == tmp_path / "orgs" / "a.json"
     assert approvals.disabled_message is None
+
+
+def test_directory_as_approvals_file_disables_approvals_safely(tmp_path: Path) -> None:
+    approvals = OverlapApprovals.from_settings(str(tmp_path), {})
+
+    review = approvals.review([VACATION_FIX])
+
+    assert review.enabled is False
+    assert review.message is not None and "Could not read" in review.message
+    assert review.overlaps[0].status == "unapproved"
+    with pytest.raises(OverlapApprovalError, match="Could not read"):
+        approvals.set_approved(VACATION_FIX_PAIR, False)
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_approvals_only_accept_pairs_from_the_latest_review(approvals_path: Path) -> None:
@@ -449,7 +493,7 @@ def test_approval_survives_server_restart(tmp_path: Path, approvals_path: Path) 
 
     with patch("org_timeviz.server.render_clock_dashboard", return_value=_dashboard(VACATION_FIX)):
         first = _Server(
-            _app_config(output_dir), output_dir, OverlapApprovals.from_environment(environ)
+            _app_config(output_dir), output_dir, OverlapApprovals.from_settings(None, environ)
         )
         try:
             pair = first.dashboard()["overlaps"][0]["pair"]
@@ -458,7 +502,7 @@ def test_approval_survives_server_restart(tmp_path: Path, approvals_path: Path) 
             first.stop()
 
         second = _Server(
-            _app_config(output_dir), output_dir, OverlapApprovals.from_environment(environ)
+            _app_config(output_dir), output_dir, OverlapApprovals.from_settings(None, environ)
         )
         try:
             assert _statuses(second.dashboard()) == ["approved"]
@@ -528,7 +572,7 @@ def test_approval_endpoint_validates_requests(
 def test_approval_endpoint_is_disabled_without_configured_store(tmp_path: Path) -> None:
     output_dir = tmp_path / "outputs"
     output_dir.mkdir()
-    running = _Server(_app_config(output_dir), output_dir, OverlapApprovals.from_environment({}))
+    running = _Server(_app_config(output_dir), output_dir, OverlapApprovals.from_settings(None, {}))
     try:
         with patch(
             "org_timeviz.server.render_clock_dashboard", return_value=_dashboard(VACATION_FIX)
@@ -541,10 +585,10 @@ def test_approval_endpoint_is_disabled_without_configured_store(tmp_path: Path) 
         running.stop()
 
     assert payload["overlap_approvals"]["enabled"] is False
-    assert APPROVALS_FILE_ENV_VAR in payload["overlap_approvals"]["message"]
+    assert APPROVALS_FILE_SETTING in payload["overlap_approvals"]["message"]
     assert _statuses(payload) == ["unapproved"]
     assert status == 409
-    assert APPROVALS_FILE_ENV_VAR in result["error"]
+    assert APPROVALS_FILE_SETTING in result["error"]
 
 
 def test_malformed_store_disables_approvals_and_is_preserved(
@@ -649,7 +693,7 @@ def _accounting_snapshot(
 
 
 def _start_e2e_server(cfg: AppConfig, approvals_path: Path) -> _Server:
-    approvals = OverlapApprovals.from_environment({APPROVALS_FILE_ENV_VAR: str(approvals_path)})
+    approvals = OverlapApprovals.from_settings(str(approvals_path), {})
     return _Server(cfg, Path(cfg.app.output_dir), approvals)
 
 

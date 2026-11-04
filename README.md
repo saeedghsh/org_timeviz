@@ -86,20 +86,32 @@ series.
 
 #### Setup
 
-Approvals are personal data, so they are stored outside this repository in a
-file named by the `ORG_TIMEVIZ_OVERLAP_APPROVALS_FILE` environment variable,
-for example in your shell profile:
+Approvals are personal data, so they are stored outside this repository, in
+the private `orgs` repository next to the Org files. The recommended way to
+choose the file is the `app.overlap_approvals_file` setting in the YAML config,
+which `configs/default.yaml` already sets:
 
-```bash
-export ORG_TIMEVIZ_OVERLAP_APPROVALS_FILE="$HOME/code/orgs/timeviz/approved_overlaps.json"
+```yaml
+app:
+  overlap_approvals_file: ~/code/orgs/timeviz/approved_overlaps.json
 ```
 
-The path must be absolute (`~` is expanded). The file and its immediate parent
+With this setting, `make serve` enables approvals without any environment
+variable. The optional `ORG_TIMEVIZ_OVERLAP_APPROVALS_FILE` environment
+variable overrides the setting when it is set and nonempty, for example to try
+approvals against a scratch file:
+
+```bash
+ORG_TIMEVIZ_OVERLAP_APPROVALS_FILE="$HOME/scratch/approved_overlaps.json" make serve
+```
+
+The path must be absolute (`~` is expanded); a relative path disables approvals
+with a note naming the setting at fault. The file and its immediate parent
 directory are created on the first approval, so it can live in, and be
-committed to, a private Org repository. Restart `make serve` after changing the
-variable. When it is unset, the dashboard works as before, with approval
-controls disabled and a note explaining how to enable them. Viewing the
-dashboard only reads the file; it is rewritten atomically, and only when an
+committed to, the private Org repository. Restart `make serve` after changing
+either setting. When neither is set, the dashboard works as before, with
+approval controls disabled and a note explaining how to enable them. Viewing
+the dashboard only reads the file; it is rewritten atomically, and only when an
 approval actually changes.
 
 #### Clock identity and Org IDs
@@ -197,6 +209,9 @@ shared filters and plot settings; it does not list report names.
 
 * `app.output_dir`: output directory (default `outputs/`)
 * `app.log_level`: logging level (e.g. `INFO`)
+* `app.overlap_approvals_file`: private JSON file for approved clock overlaps;
+  null disables approvals, and `ORG_TIMEVIZ_OVERLAP_APPROVALS_FILE` overrides it
+  (see [Approving intentional overlaps](#approving-intentional-overlaps))
 * `org_sources`: where to get Org files (either from `org-agenda-files` in an
   Emacs init file, or an explicit list)
 * `reports.filters`: include/exclude tags and task regex filters applied to all

@@ -55,6 +55,8 @@ class AppSettings(_BaseConfig):
 
     output_dir: str = Field(default="outputs")
     log_level: str = Field(default="INFO")
+    # Overridden by ORG_TIMEVIZ_OVERLAP_APPROVALS_FILE; if null, approvals are disabled.
+    overlap_approvals_file: str | None = Field(default=None)
 
 
 class OrgSourcesConfig(_BaseConfig):

@@ -8,7 +8,7 @@ from urllib.request import Request, urlopen
 import pytest
 
 from org_timeviz.config import AppConfig
-from org_timeviz.overlap_approvals import OverlapApprovals
+from org_timeviz.overlap_approvals import APPROVALS_FILE_ENV_VAR, OverlapApprovals
 from org_timeviz.rendering.index import write_index_html
 from org_timeviz.server import (
     REFRESH_HEADER,
@@ -20,10 +20,14 @@ from org_timeviz.server import (
 )
 
 
-def _app_config(output_dir: Path) -> AppConfig:
+def _app_config(output_dir: Path, overlap_approvals_file: str | None = None) -> AppConfig:
     return AppConfig.model_validate(
         {
-            "app": {"output_dir": str(output_dir), "log_level": "INFO"},
+            "app": {
+                "output_dir": str(output_dir),
+                "log_level": "INFO",
+                "overlap_approvals_file": overlap_approvals_file,
+            },
             "org_sources": {"mode": "explicit", "explicit_files": []},
             "time_buckets": {
                 "other_bucket": "other",
@@ -203,12 +207,8 @@ def test_refresh_endpoint_reports_generation_failure(tmp_path: Path) -> None:
         _stop_server(server, thread)
 
 
-def test_serve_reports_generates_before_serving(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    approvals_path = tmp_path / "private" / "approved_overlaps.json"
-    monkeypatch.setenv("ORG_TIMEVIZ_OVERLAP_APPROVALS_FILE", str(approvals_path))
-    cfg = _app_config(tmp_path / "outputs")
+def _serve_reports_until_interrupted(cfg: AppConfig) -> tuple[MagicMock, MagicMock]:
+    """Run `serve_reports` against a fake server; return the report and server mocks."""
     fake_server = MagicMock()
     fake_server.__enter__.return_value = fake_server
     fake_server.__exit__.return_value = False
@@ -220,11 +220,46 @@ def test_serve_reports_generates_before_serving(
         patch("org_timeviz.server._build_server", return_value=fake_server) as build_server,
     ):
         serve_reports(cfg, port=8000)
+    return generate, build_server
+
+
+def test_serve_reports_generates_before_serving(tmp_path: Path) -> None:
+    cfg = _app_config(tmp_path / "outputs")
+
+    generate, build_server = _serve_reports_until_interrupted(cfg)
 
     generate.assert_called_once_with(cfg)
     build_server.assert_called_once()
     assert build_server.call_args.args[:3] == (cfg, (tmp_path / "outputs").resolve(), 8000)
-    assert build_server.call_args.args[3].store_path == approvals_path
+
+
+@pytest.mark.parametrize(
+    ("environment_file", "configured_file", "expected"),
+    [
+        (None, "~/orgs/timeviz/approved_overlaps.json", "orgs/timeviz/approved_overlaps.json"),
+        ("~/override.json", "~/orgs/timeviz/approved_overlaps.json", "override.json"),
+        (None, None, None),
+    ],
+)
+def test_serve_reports_configures_overlap_approvals_from_yaml_or_environment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    environment_file: str | None,
+    configured_file: str | None,
+    expected: str | None,
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    if environment_file is None:
+        monkeypatch.delenv(APPROVALS_FILE_ENV_VAR, raising=False)
+    else:
+        monkeypatch.setenv(APPROVALS_FILE_ENV_VAR, environment_file)
+    cfg = _app_config(tmp_path / "outputs", overlap_approvals_file=configured_file)
+
+    _, build_server = _serve_reports_until_interrupted(cfg)
+
+    approvals = build_server.call_args.args[3]
+    assert approvals.store_path == (None if expected is None else tmp_path / expected)
+    assert (approvals.disabled_message is None) == (expected is not None)
 
 
 def test_main_loads_config_and_starts_server(tmp_path: Path) -> None:

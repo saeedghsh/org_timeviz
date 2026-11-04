@@ -33,6 +33,7 @@ from typing import Literal, Self
 from .org_source.clock_dashboard import ClockOverlap, OverlapClock
 
 APPROVALS_FILE_ENV_VAR = "ORG_TIMEVIZ_OVERLAP_APPROVALS_FILE"
+APPROVALS_FILE_SETTING = "app.overlap_approvals_file"
 SCHEMA_VERSION = 1
 _TIMESTAMP_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}")
 _DOCUMENT_KEYS = {"version", "approved_overlaps"}
@@ -265,21 +266,32 @@ class OverlapApprovals:
         self._approvable: frozenset[OverlapPair] = frozenset()
 
     @classmethod
-    def from_environment(cls, environ: Mapping[str, str]) -> Self:
-        """Configure the store from `ORG_TIMEVIZ_OVERLAP_APPROVALS_FILE`."""
+    def from_settings(cls, configured_file: str | None, environ: Mapping[str, str]) -> Self:
+        """Configure the store from the environment override or the YAML setting.
+
+        A nonempty `ORG_TIMEVIZ_OVERLAP_APPROVALS_FILE` takes precedence over
+        CONFIGURED_FILE, the `app.overlap_approvals_file` setting.
+        """
+        source = APPROVALS_FILE_ENV_VAR
         value = environ.get(APPROVALS_FILE_ENV_VAR, "").strip()
+        if not value:
+            source = APPROVALS_FILE_SETTING
+            value = (configured_file or "").strip()
         if not value:
             return cls(
                 None,
-                f"Overlap approval is disabled. Set {APPROVALS_FILE_ENV_VAR} to an "
-                "approval JSON file outside this repository and restart the server.",
+                f"Overlap approval is disabled. Set {APPROVALS_FILE_SETTING} in the config "
+                f"file (or the {APPROVALS_FILE_ENV_VAR} environment variable) to an approval "
+                "JSON file outside this repository and restart the server.",
             )
-        path = Path(value).expanduser()
+        try:
+            path = Path(value).expanduser()
+        except RuntimeError:  # `~user` for an unknown user stays relative.
+            path = Path(value)
         if not path.is_absolute():
             return cls(
                 None,
-                f"Overlap approval is disabled: {APPROVALS_FILE_ENV_VAR} must be an "
-                f"absolute path, not {value!r}.",
+                f"Overlap approval is disabled: {source} must be an absolute path, not {value!r}.",
             )
         return cls(ApprovalStore(path))
 

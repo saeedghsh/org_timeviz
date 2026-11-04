@@ -216,7 +216,7 @@ def serve_reports(cfg: AppConfig, port: int = DEFAULT_PORT) -> None:
     output_dir = Path(cfg.app.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    overlap_approvals = OverlapApprovals.from_environment(os.environ)
+    overlap_approvals = OverlapApprovals.from_settings(cfg.app.overlap_approvals_file, os.environ)
     if overlap_approvals.store_path is None:
         _LOG.warning("%s", overlap_approvals.disabled_message)
     else:
