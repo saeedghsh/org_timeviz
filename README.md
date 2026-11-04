@@ -39,7 +39,8 @@ caching disabled so regenerated plots are fetched immediately.
 When the page is served through `make serve`, a text dashboard appears above the
 plots with:
 
-* suspicious clocks across the agenda files: malformed lines, open clocks,
+* suspicious clocks across the configured Org files and their
+  [archives](#org-archive-files): malformed lines, open clocks,
   and declared-duration mismatches as text, followed by an interactive table of
   overlapping intervals. Each overlapping pair shows the `file:line` of both
   `CLOCK:` lines for navigation; line numbers change as Org files are edited,
@@ -51,7 +52,8 @@ plots with:
 
 The chronological, daily-total, and weekly selectors each default to today and
 can be changed independently. Live clocks are included through the current time
-in all three reports.
+in all three reports. All dashboard reports read the same files as the plots,
+including archive files, rather than `org-agenda-files`.
 
 These reports deliberately reuse the clock helpers from the configured Emacs
 setup rather than reimplementing their semantics in Python. The configured
@@ -61,7 +63,7 @@ formatting helpers; with the default configuration this can be
 `~/.emacs.d/lisp/init-org.el`. The suspect report uses `my/org-clock-suspects`
 for the existing clock-line checks and supplements it with an overlap scan.
 
-Dashboard reads are non-mutating. Before opening agenda files in the batch Emacs
+Dashboard reads are non-mutating. Before opening Org files in the batch Emacs
 process, org-timeviz disables `my/org-auto-resolve-dangling-clocks` when that
 variable exists, so viewing the dashboard does not automatically resolve or
 rewrite dangling clocks.
@@ -225,6 +227,12 @@ joins the headings with `/`, so a task under a parent heading containing either
 gets a slightly different outline path, as used by task totals and
 `reports.filters` task regexes, once archived. Archive files are only read,
 never modified.
+
+Archiving keeps a heading's `ID` property and its `CLOCK` timestamps, so an
+[approved overlap](#approving-intentional-overlaps) stays approved when one of
+its tasks is archived. If a copy of the task is left in the active file as
+well, both copies are counted and the overlap can no longer be approved,
+because its identity is ambiguous.
 
 ## Configuration
 

@@ -72,13 +72,17 @@ VACATION_FIX_PAIR = OverlapPair.of(
 )
 
 
-def _app_config(output_dir: Path, init_paths: list[Path] | None = None) -> AppConfig:
+def _app_config(
+    output_dir: Path,
+    init_paths: list[Path] | None = None,
+    org_files: list[Path] | None = None,
+) -> AppConfig:
     return AppConfig.model_validate(
         {
             "app": {"output_dir": str(output_dir), "log_level": "INFO"},
             "org_sources": {
                 "mode": "explicit",
-                "explicit_files": [],
+                "explicit_files": [str(path) for path in (org_files or [])],
                 "emacs_init_paths": [str(path) for path in (init_paths or [])],
             },
             "time_buckets": {
@@ -673,7 +677,7 @@ def org_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[AppC
     init_path = tmp_path / "init-org.el"
     write_dashboard_init(init_path, org_files)
     (tmp_path / "outputs").mkdir()
-    return _app_config(tmp_path / "outputs", [init_path]), org_files
+    return _app_config(tmp_path / "outputs", [init_path], org_files), org_files
 
 
 def _accounting_snapshot(
