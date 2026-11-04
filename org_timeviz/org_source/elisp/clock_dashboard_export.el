@@ -4,6 +4,7 @@
 (require 'cl-lib)
 (require 'json)
 (require 'org)
+(require 'org-id)
 
 ;; The user's init-org.el resolves dangling clocks whenever an Org buffer opens.
 ;; Dashboard reads must never mutate source Org files.
@@ -70,43 +71,40 @@
      "\n")))
 
 (defun org-timeviz-dashboard--suspect-text ()
-  "Render clock-line issues and overlapping intervals across agenda files."
-  (let* ((raw-issues (my/org-clock-suspects (org-agenda-files)))
-         (issue-rows
-          (mapcar
-           (lambda (row)
-             (list (nth 0 row)
-                   (org-timeviz-dashboard--link-description (nth 1 row))
-                   (nth 2 row)
-                   (nth 3 row)
-                   (nth 4 row)))
-           raw-issues))
-         (overlap-rows (org-timeviz-dashboard--overlap-rows))
-         (sections '()))
-    (when issue-rows
-      (push
-       (concat
-        "Clock-line issues:\n"
-        (org-timeviz-dashboard--render-table
-         '("File" "Heading" "Issue" "Clock line" "Details")
-         issue-rows))
-       sections))
-    (when overlap-rows
-      (push
-       (concat
-        "Overlapping clocks:\n"
-        (org-timeviz-dashboard--render-table
-         '("Task A" "Interval A" "Location A" "Task B" "Interval B" "Location B")
-         overlap-rows))
-       sections))
-    (if sections
-        (mapconcat #'identity (nreverse sections) "\n\n")
-      "All CLOCK lines look standard; no overlapping intervals found.")))
+  "Render clock-line issues across agenda files.
+Overlapping intervals are reported separately as structured records."
+  (let ((issue-rows
+         (mapcar
+          (lambda (row)
+            (list (nth 0 row)
+                  (org-timeviz-dashboard--link-description (nth 1 row))
+                  (nth 2 row)
+                  (nth 3 row)
+                  (nth 4 row)))
+          (my/org-clock-suspects (org-agenda-files)))))
+    (if issue-rows
+        (concat
+         "Clock-line issues:\n"
+         (org-timeviz-dashboard--render-table
+          '("File" "Heading" "Issue" "Clock line" "Details")
+          issue-rows))
+      "All CLOCK lines look standard.")))
+
+(defun org-timeviz-dashboard--timestamp-identity (timestamp)
+  "Return Org TIMESTAMP as a timezone-independent YYYY-MM-DDTHH:MM string."
+  (let ((parsed (org-parse-time-string timestamp)))
+    (format "%04d-%02d-%02dT%02d:%02d"
+            (nth 5 parsed) (nth 4 parsed) (nth 3 parsed)
+            (nth 2 parsed) (nth 1 parsed))))
 
 (defun org-timeviz-dashboard--all-intervals ()
   "Collect closed and open clock intervals from all agenda files.
-Each row is (START END FILE HEADING OPEN LINE), where LINE is the
-1-based line number of the CLOCK line itself."
+Each row is (START END FILE HEADING OPEN LINE ORG-ID START-STAMP END-STAMP).
+LINE is the 1-based line number of the CLOCK line itself.  ORG-ID is the
+owning heading's own ID property, or nil; it is never created here.
+START-STAMP and END-STAMP are the clock's timestamps as written, normalized
+by `org-timeviz-dashboard--timestamp-identity'; END-STAMP is nil for open
+clocks."
   (let ((rows '())
         (now (float-time (current-time))))
     (dolist (file (org-agenda-files))
@@ -135,7 +133,13 @@ Each row is (START END FILE HEADING OPEN LINE), where LINE is the
                                    (file-name-nondirectory file)
                                    (org-get-heading t t t t)
                                    open
-                                   line)
+                                   line
+                                   (org-id-get)
+                                   (org-timeviz-dashboard--timestamp-identity
+                                    (caar timestamps))
+                                   (unless open
+                                     (org-timeviz-dashboard--timestamp-identity
+                                      (caadr timestamps))))
                              rows))
                         (error nil)))))))))))
     (cl-sort rows #'< :key #'car)))
@@ -150,10 +154,6 @@ Each row is (START END FILE HEADING OPEN LINE), where LINE is the
 (defun org-timeviz-dashboard--task-label (row)
   "Format interval ROW's file and heading."
   (format "%s: %s" (nth 2 row) (nth 3 row)))
-
-(defun org-timeviz-dashboard--location-label (row)
-  "Format interval ROW's CLOCK line as FILE:LINE for navigation."
-  (format "%s:%d" (nth 2 row) (nth 5 row)))
 
 (defun org-timeviz-dashboard--display-key (row)
   "Return the key ordering interval ROW within a displayed overlap pair.
@@ -179,8 +179,19 @@ order never depends on which interval the overlap scan found first."
       (list second first)
     (list first second)))
 
-(defun org-timeviz-dashboard--overlap-rows ()
-  "Return readable rows for every pair of overlapping clock intervals."
+(defun org-timeviz-dashboard--overlap-clock (row)
+  "Return interval ROW as a JSON-ready overlap clock record."
+  `((task . ,(org-timeviz-dashboard--task-label row))
+    (interval . ,(org-timeviz-dashboard--interval-label row))
+    (file . ,(nth 2 row))
+    (line . ,(nth 5 row))
+    (org_id . ,(nth 6 row))
+    (start . ,(nth 7 row))
+    (end . ,(nth 8 row))))
+
+(defun org-timeviz-dashboard--overlap-records ()
+  "Return a JSON-ready vector describing every pair of overlapping intervals.
+Task A is the interval with the shorter task label."
   (let ((active '())
         (overlaps '()))
     (dolist (row (org-timeviz-dashboard--all-intervals))
@@ -191,15 +202,11 @@ order never depends on which interval the overlap scan found first."
       (dolist (other active)
         (let ((pair (org-timeviz-dashboard--display-pair other row)))
           (push
-           (list (org-timeviz-dashboard--task-label (nth 0 pair))
-                 (org-timeviz-dashboard--interval-label (nth 0 pair))
-                 (org-timeviz-dashboard--location-label (nth 0 pair))
-                 (org-timeviz-dashboard--task-label (nth 1 pair))
-                 (org-timeviz-dashboard--interval-label (nth 1 pair))
-                 (org-timeviz-dashboard--location-label (nth 1 pair)))
+           `((a . ,(org-timeviz-dashboard--overlap-clock (nth 0 pair)))
+             (b . ,(org-timeviz-dashboard--overlap-clock (nth 1 pair))))
            overlaps)))
       (push row active))
-    (nreverse overlaps)))
+    (vconcat (nreverse overlaps))))
 
 (defun org-timeviz-dashboard--clocklog-text (date-str rows)
   "Render chronological clock ROWS for DATE-STR."
@@ -284,6 +291,7 @@ order never depends on which interval the overlap scan found first."
          (day-total-rows (my/org-clocklog-rows day-total-day (org-agenda-files)))
          (payload
           `((suspects . ,(org-timeviz-dashboard--suspect-text))
+            (overlaps . ,(org-timeviz-dashboard--overlap-records))
             (chronological . ,(org-timeviz-dashboard--clocklog-text day day-rows))
             (day_total . ,(org-timeviz-dashboard--day-total day-total-rows))
             (week_total . ,(org-timeviz-dashboard--week-total week-start)))))

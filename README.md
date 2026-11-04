@@ -39,9 +39,11 @@ When the page is served through `make serve`, a text dashboard appears above the
 plots with:
 
 * suspicious clocks across the agenda files: malformed lines, open clocks,
-  declared-duration mismatches, and overlapping intervals. Each overlapping
-  pair shows the `file:line` of both `CLOCK:` lines for navigation; line
-  numbers change as Org files are edited, so they are display-only.
+  and declared-duration mismatches as text, followed by an interactive table of
+  overlapping intervals. Each overlapping pair shows the `file:line` of both
+  `CLOCK:` lines for navigation; line numbers change as Org files are edited,
+  so they are display-only. Intentional overlaps can be approved and hidden;
+  see [Approving intentional overlaps](#approving-intentional-overlaps).
 * chronological clock entries for a selected day, including gaps between entries
 * total logged time for an independently selected day
 * total logged time for the Monday-to-Sunday week containing a selected date
@@ -67,6 +69,85 @@ Changing any clock-dashboard date automatically refreshes the text reports. Use
 **Refresh clock reports** to reload them without changing a date, for example
 after correcting a suspicious clock in Org. This does not regenerate the plots;
 use **Refresh reports** when the plots themselves need to be regenerated.
+
+### Approving intentional overlaps
+
+Some overlaps are deliberate, for example work clocked during a vacation or
+sick-leave entry. Each unapproved overlap in the table has an **Approve**
+button; approved overlaps are hidden until **Show approved overlaps** is
+checked, where they are dimmed and can be reverted with **Unapprove**. Both
+actions are saved immediately and survive dashboard refreshes, report
+regeneration, and server restarts.
+
+Approval only hides the warning. It never edits Org files and never changes any
+time accounting: overlapping clocks are still counted independently in the
+daily and weekly totals, time-bucket totals, monthly trends, and raw-tag time
+series.
+
+#### Setup
+
+Approvals are personal data, so they are stored outside this repository in a
+file named by the `ORG_TIMEVIZ_OVERLAP_APPROVALS_FILE` environment variable,
+for example in your shell profile:
+
+```bash
+export ORG_TIMEVIZ_OVERLAP_APPROVALS_FILE="$HOME/code/orgs/timeviz/approved_overlaps.json"
+```
+
+The path must be absolute (`~` is expanded). The file and its immediate parent
+directory are created on the first approval, so it can live in, and be
+committed to, a private Org repository. Restart `make serve` after changing the
+variable. When it is unset, the dashboard works as before, with approval
+controls disabled and a note explaining how to enable them. Viewing the
+dashboard only reads the file; it is rewritten atomically, and only when an
+approval actually changes.
+
+#### Clock identity and Org IDs
+
+A clock is identified by the `ID` property of its heading plus its start and
+end timestamps. Task titles and line numbers are not part of the identity, so
+renaming a task or editing elsewhere in the file keeps its approvals. Changing
+a clock's start or end creates a new identity, so the old approval no longer
+applies and the overlap reappears for review. The two clocks of an approval
+are stored in a normalized order, so Task A and Task B are interchangeable.
+
+An overlap cannot be approved, and the table says why, while:
+
+* either heading has no `ID` property
+* either clock is still open
+* two clocks share the same ID and interval, for example a duplicated `CLOCK:`
+  line, because the approval could not tell them apart
+
+org-timeviz never creates IDs. To add a missing one, open the Org file in Emacs,
+put point on the heading (or anywhere in its entry), run
+`M-x org-id-get-create`, and save the file. Then click **Refresh** on the clock
+dashboard; the overlap becomes approvable.
+
+#### Approval file format
+
+```json
+{
+  "version": 1,
+  "approved_overlaps": [
+    [
+      {"org_id": "8f0c6f0e-...", "start": "2026-01-05T13:00", "end": "2026-01-05T17:00"},
+      {"org_id": "2b9d41aa-...", "start": "2026-01-05T13:35", "end": "2026-01-05T15:11"}
+    ]
+  ]
+}
+```
+
+* `version`: schema version, currently `1`
+* `approved_overlaps`: approved pairs, each a list of exactly two clock
+  identities
+* `org_id`: the heading's `ID` property
+* `start`, `end`: the clock's timestamps as written in Org, formatted as
+  `YYYY-MM-DDTHH:MM` without a time zone
+
+No task titles or descriptions are stored. A file that does not match this
+schema is left untouched: approvals are disabled and the dashboard shows the
+validation error until the file is fixed. Approvals for clocks that no longer
+overlap stay in the file and are simply unused.
 
 Use a different port when needed:
 

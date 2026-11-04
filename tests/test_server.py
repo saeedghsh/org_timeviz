@@ -8,6 +8,7 @@ from urllib.request import Request, urlopen
 import pytest
 
 from org_timeviz.config import AppConfig
+from org_timeviz.overlap_approvals import OverlapApprovals
 from org_timeviz.rendering.index import write_index_html
 from org_timeviz.server import (
     REFRESH_HEADER,
@@ -40,7 +41,7 @@ def _app_config(output_dir: Path) -> AppConfig:
 
 
 def _start_server(cfg: AppConfig, output_dir: Path) -> tuple[ThreadingHTTPServer, Thread, str]:
-    server = _build_server(cfg, output_dir, port=0)
+    server = _build_server(cfg, output_dir, port=0, overlap_approvals=OverlapApprovals(None))
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     host, port = server.server_address
@@ -202,7 +203,11 @@ def test_refresh_endpoint_reports_generation_failure(tmp_path: Path) -> None:
         _stop_server(server, thread)
 
 
-def test_serve_reports_generates_before_serving(tmp_path: Path) -> None:
+def test_serve_reports_generates_before_serving(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    approvals_path = tmp_path / "private" / "approved_overlaps.json"
+    monkeypatch.setenv("ORG_TIMEVIZ_OVERLAP_APPROVALS_FILE", str(approvals_path))
     cfg = _app_config(tmp_path / "outputs")
     fake_server = MagicMock()
     fake_server.__enter__.return_value = fake_server
@@ -217,7 +222,9 @@ def test_serve_reports_generates_before_serving(tmp_path: Path) -> None:
         serve_reports(cfg, port=8000)
 
     generate.assert_called_once_with(cfg)
-    build_server.assert_called_once_with(cfg, (tmp_path / "outputs").resolve(), 8000)
+    build_server.assert_called_once()
+    assert build_server.call_args.args[:3] == (cfg, (tmp_path / "outputs").resolve(), 8000)
+    assert build_server.call_args.args[3].store_path == approvals_path
 
 
 def test_main_loads_config_and_starts_server(tmp_path: Path) -> None:

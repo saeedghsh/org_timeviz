@@ -416,6 +416,13 @@ def _clock_dashboard_html() -> str:
     <article class="clock-report">
       <h2>Suspicious clocks</h2>
       <pre><code id="clock-suspects">Loading...</code></pre>
+      <div class="clock-report-heading overlap-heading">
+        <h3>Overlapping clocks</h3>
+        <span id="overlap-approval-status" role="status"></span>
+        <label><input id="show-approved-overlaps" type="checkbox" /> Show approved overlaps</label>
+      </div>
+      <p id="overlap-approval-message" class="overlap-note" hidden></p>
+      <div id="clock-overlaps" class="overlap-table-wrapper">Loading...</div>
     </article>
 
     <article class="clock-report">
@@ -450,10 +457,19 @@ def _clock_dashboard_html() -> str:
       const refreshButton = document.getElementById("refresh-clock-dashboard");
       const dashboardStatus = document.getElementById("clock-dashboard-status");
       const suspects = document.getElementById("clock-suspects");
+      const overlapsOutput = document.getElementById("clock-overlaps");
+      const showApprovedInput = document.getElementById("show-approved-overlaps");
+      const approvalMessage = document.getElementById("overlap-approval-message");
+      const approvalStatus = document.getElementById("overlap-approval-status");
       const chronological = document.getElementById("clock-chronological");
       const dayTotal = document.getElementById("clock-day-total");
       const weekTotal = document.getElementById("clock-week-total");
-      const outputs = [suspects, chronological, dayTotal, weekTotal];
+      const outputs = [suspects, overlapsOutput, chronological, dayTotal, weekTotal];
+      const overlapColumns = [
+        "Task A", "Interval A", "Location A", "Task B", "Interval B", "Location B", "Approval",
+      ];
+      let overlaps = [];
+      let approvalsEnabled = false;
 
       function localDateValue(value) {
         const year = value.getFullYear();
@@ -484,8 +500,105 @@ def _clock_dashboard_html() -> str:
         }
       }
 
+      function appendCell(row, text, className) {
+        const cell = row.insertCell();
+        cell.textContent = text;
+        if (className) {
+          cell.className = className;
+        }
+        return cell;
+      }
+
+      function approvalButton(overlap) {
+        const approve = overlap.status !== "approved";
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = approve ? "Approve" : "Unapprove";
+        button.addEventListener("click", () => setOverlapApproval(overlap, approve, button));
+        return button;
+      }
+
+      function renderOverlaps() {
+        const approvedCount = overlaps.filter((overlap) => overlap.status === "approved").length;
+        const visible = showApprovedInput.checked
+          ? overlaps
+          : overlaps.filter((overlap) => overlap.status !== "approved");
+        overlapsOutput.replaceChildren();
+        if (!visible.length) {
+          const empty = document.createElement("p");
+          empty.className = "overlap-note";
+          empty.textContent = overlaps.length
+            ? `No unapproved overlapping clocks (${approvedCount} approved hidden).`
+            : "No overlapping clocks found.";
+          overlapsOutput.append(empty);
+          return;
+        }
+
+        const table = document.createElement("table");
+        table.className = "overlap-table";
+        const header = table.createTHead().insertRow();
+        for (const column of overlapColumns) {
+          const cell = document.createElement("th");
+          cell.textContent = column;
+          header.append(cell);
+        }
+        const body = table.createTBody();
+        for (const overlap of visible) {
+          const row = body.insertRow();
+          if (overlap.status === "approved") {
+            row.className = "approved-overlap";
+          }
+          for (const clock of [overlap.a, overlap.b]) {
+            appendCell(row, clock.task, "overlap-task");
+            appendCell(row, clock.interval);
+            appendCell(row, `${clock.file}:${clock.line}`);
+          }
+          if (overlap.status === "blocked") {
+            appendCell(row, overlap.reasons.join("; "), "overlap-blocked");
+          } else if (!approvalsEnabled) {
+            appendCell(row, overlap.status === "approved" ? "Approved" : "");
+          } else {
+            const cell = appendCell(row, overlap.status === "approved" ? "Approved " : "");
+            cell.append(approvalButton(overlap));
+          }
+        }
+        overlapsOutput.append(table);
+      }
+
+      function renderApprovalSettings(settings) {
+        approvalsEnabled = settings.enabled;
+        approvalMessage.textContent = settings.message || "";
+        approvalMessage.hidden = !settings.message;
+        showApprovedInput.disabled = !approvalsEnabled;
+      }
+
+      async function setOverlapApproval(overlap, approve, button) {
+        button.disabled = true;
+        approvalStatus.textContent = approve ? "Approving..." : "Unapproving...";
+        try {
+          const response = await fetch("/overlap-approvals", {
+            method: "POST",
+            headers: {"Content-Type": "application/json", "X-Org-Timeviz-Approval": "1"},
+            body: JSON.stringify({action: approve ? "approve" : "unapprove", pair: overlap.pair}),
+            cache: "no-store",
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(result.error || `server returned HTTP ${response.status}`);
+          }
+          overlap.status = approve ? "approved" : "unapproved";
+          approvalStatus.textContent = "";
+          renderOverlaps();
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          approvalStatus.textContent = `Approval failed: ${message}`;
+          button.disabled = false;
+        }
+      }
+
       async function loadClockDashboard() {
         setAll("Loading...");
+        approvalStatus.textContent = "";
         refreshButton.disabled = true;
         dashboardStatus.textContent = "Refreshing...";
         const params = new URLSearchParams({
@@ -501,6 +614,9 @@ def _clock_dashboard_html() -> str:
           }
           const payload = await response.json();
           suspects.textContent = payload.suspects;
+          overlaps = payload.overlaps;
+          renderApprovalSettings(payload.overlap_approvals);
+          renderOverlaps();
           renderChronological(payload.chronological);
           dayTotal.textContent = `${payload.day_total_day}: ${payload.day_total}`;
           weekTotal.textContent = `${payload.week_start} to ${payload.week_end}: ${payload.week_total}`;
@@ -524,6 +640,7 @@ def _clock_dashboard_html() -> str:
         dayTotalDateInput.disabled = true;
         weekDateInput.disabled = true;
         refreshButton.disabled = true;
+        showApprovedInput.disabled = true;
         setAll("Clock dashboard requires make serve.");
         return;
       }
@@ -532,6 +649,7 @@ def _clock_dashboard_html() -> str:
       dayTotalDateInput.addEventListener("change", loadClockDashboard);
       weekDateInput.addEventListener("change", loadClockDashboard);
       refreshButton.addEventListener("click", loadClockDashboard);
+      showApprovedInput.addEventListener("change", renderOverlaps);
       loadClockDashboard();
     })();
   </script>
@@ -730,6 +848,21 @@ $body
     .clock-report pre { overflow-x: auto; margin: 8px 0 0 0; padding: 12px; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; }
     .clock-report code { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
     .clock-gap-row { color: #656d76; }
+    .overlap-heading { margin-top: 14px; }
+    .overlap-heading h3 { flex: 1; font-size: 16px; margin: 0; }
+    #overlap-approval-status { color: #555; }
+    .overlap-note { color: #555; margin: 8px 0 0 0; }
+    .overlap-table-wrapper { overflow-x: auto; margin: 8px 0 0 0; }
+    .overlap-table { border-collapse: collapse; font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; font-size: 13px; }
+    .overlap-table th, .overlap-table td { padding: 4px 8px; border: 1px solid #d0d7de; text-align: left; vertical-align: top; white-space: nowrap; }
+    .overlap-table th { background: #f6f8fa; }
+    .overlap-table .overlap-task { white-space: normal; min-width: 16ch; max-width: 32ch; }
+    .overlap-table tr > :last-child { position: sticky; right: 0; min-width: 12ch; max-width: 24ch; white-space: normal; background: #fff; box-shadow: inset 1px 0 0 #d0d7de; }
+    .overlap-table th:last-child { background: #f6f8fa; }
+    .overlap-table .approved-overlap td { color: #656d76; background: #f6f8fa; }
+    .overlap-table button { padding: 2px 8px; cursor: pointer; }
+    .overlap-table button:disabled { cursor: default; opacity: 0.6; }
+    .overlap-blocked { color: #9a6700; }
   </style>
 </head>
 <body>
