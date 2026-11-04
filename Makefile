@@ -43,18 +43,18 @@ coverage:
 	@echo "\n=== Generating coverage report ==="
 	@$(UV_RUN) coverage report -m
 
-.PHONY: formatter
-formatter: ## Check code formatting with Ruff.
-	@echo "\n=== Checking code formatting ==="
-	@$(UV_RUN) ruff format --check .
-
 .PHONY: format
 format: ## Format Python code with Ruff.
 	@echo "\n=== Formatting Python files ==="
 	@$(UV_RUN) ruff format .
 
-.PHONY: linter
-linter: ## Run Ruff lint checks.
+.PHONY: format-check
+format-check: ## Check Python formatting with Ruff without changing files.
+	@echo "\n=== Checking code formatting ==="
+	@$(UV_RUN) ruff format --check .
+
+.PHONY: lint
+lint: ## Run Ruff lint checks.
 	@echo "\n=== Linting Python files ==="
 	@$(UV_RUN) ruff check .
 
@@ -63,6 +63,11 @@ lint-fix: ## Apply Ruff's safe automatic lint fixes.
 	@echo "\n=== Applying Ruff lint fixes ==="
 	@$(UV_RUN) ruff check --fix .
 
+# Earlier names, kept for compatibility.
+.PHONY: formatter linter
+formatter: format-check
+linter: lint
+
 .PHONY: type-check
 type-check: ## Run static type checking.
 	@echo "\n=== Running type checks (all) ==="
@@ -70,7 +75,7 @@ type-check: ## Run static type checking.
 
 .PHONY: code-quality
 code-quality: ## Run formatting, linting, typing, and unit tests.
-	@$(MAKE) formatter
-	@$(MAKE) linter
+	@$(MAKE) format-check
+	@$(MAKE) lint
 	@$(MAKE) type-check
 	@$(MAKE) test

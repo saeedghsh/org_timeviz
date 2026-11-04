@@ -1,11 +1,11 @@
 from datetime import date, datetime
 
+from conftest import make_clipped, make_record
+
 from org_timeviz.aggregate import compute_aggregates
 from org_timeviz.config import FiltersConfig, TimeBucketsConfig
 from org_timeviz.filters import apply_filters, clip_to_window
 from org_timeviz.time_windows import TimeWindow
-
-from conftest import make_clipped, make_record
 
 
 def test_clip_to_window_clips_and_drops_nonoverlap() -> None:

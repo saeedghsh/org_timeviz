@@ -1,9 +1,9 @@
 """Aggregate filtered clock records into time-bucket/task/day totals."""
 
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
-from typing import Iterable
 
 from .config import TimeBucketsConfig
 from .filters import ClippedRecord

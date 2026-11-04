@@ -5,9 +5,9 @@ import csv
 import logging
 import os
 import sys
+from collections.abc import Sequence
 from datetime import timedelta
 from pathlib import Path
-from typing import Sequence
 
 from .config import AppConfig
 from .filters import ClippedRecord, apply_filters, clip_to_window

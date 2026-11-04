@@ -2,10 +2,11 @@
 
 import json
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Final, Iterable
+from typing import Final
 
 import plotly.graph_objects as go
 from matplotlib import colormaps

@@ -39,13 +39,8 @@ def _build_daily_working_hours_figure(aggs: Aggregates) -> go.Figure:
 
     full_days = _full_day_range(logged_days[0], logged_days[-1])
 
-    daily_values = [
-        _minutes_to_hours(float(aggs.minutes_by_day[day])) for day in logged_days
-    ]
-    full_values = [
-        _minutes_to_hours(float(aggs.minutes_by_day.get(day, 0)))
-        for day in full_days
-    ]
+    daily_values = [_minutes_to_hours(float(aggs.minutes_by_day[day])) for day in logged_days]
+    full_values = [_minutes_to_hours(float(aggs.minutes_by_day.get(day, 0))) for day in full_days]
 
     weekly_values = _rolling_workday_average(
         full_values,
@@ -180,10 +175,7 @@ def _timeseries_html(figure: go.Figure) -> str:
 
 def _full_day_range(start_day: date, end_day: date) -> list[date]:
     """Return all calendar days in the inclusive range."""
-    return [
-        start_day + timedelta(days=offset)
-        for offset in range((end_day - start_day).days + 1)
-    ]
+    return [start_day + timedelta(days=offset) for offset in range((end_day - start_day).days + 1)]
 
 
 def _is_workday(day: date) -> bool:

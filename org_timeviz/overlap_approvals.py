@@ -248,7 +248,7 @@ class ApprovalStore:
                     handle.write(text)
                     handle.flush()
                     os.fsync(handle.fileno())
-                os.replace(temp_path, self.path)
+                temp_path.replace(self.path)
             except BaseException:
                 temp_path.unlink(missing_ok=True)
                 raise

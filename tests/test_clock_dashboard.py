@@ -173,17 +173,19 @@ def test_render_clock_dashboard_rejects_malformed_overlaps(
     }
     stdout = f"{DASHBOARD_JSON_PREFIX}{json.dumps(payload)}\n"
 
-    with patch(
-        "org_timeviz.org_source.clock_dashboard.subprocess.run",
-        return_value=CompletedProcess([], 0, stdout=stdout, stderr=""),
+    with (
+        patch(
+            "org_timeviz.org_source.clock_dashboard.subprocess.run",
+            return_value=CompletedProcess([], 0, stdout=stdout, stderr=""),
+        ),
+        pytest.raises(RuntimeError, match="malformed overlaps"),
     ):
-        with pytest.raises(RuntimeError, match="malformed overlaps"):
-            render_clock_dashboard(
-                cfg,
-                day=date(2026, 8, 5),
-                day_total_day=date(2026, 8, 5),
-                week_start=date(2026, 8, 3),
-            )
+        render_clock_dashboard(
+            cfg,
+            day=date(2026, 8, 5),
+            day_total_day=date(2026, 8, 5),
+            week_start=date(2026, 8, 3),
+        )
 
 
 @pytest.mark.skipif(shutil.which("emacs") is None, reason="Emacs is not installed")
@@ -421,17 +423,19 @@ def test_render_clock_dashboard_reports_emacs_failure(tmp_path: Path) -> None:
     _write_dashboard_init(init_path)
     cfg = _app_config(tmp_path / "outputs", [init_path])
 
-    with patch(
-        "org_timeviz.org_source.clock_dashboard.subprocess.run",
-        return_value=CompletedProcess([], 2, stdout="some stdout", stderr="some stderr"),
+    with (
+        patch(
+            "org_timeviz.org_source.clock_dashboard.subprocess.run",
+            return_value=CompletedProcess([], 2, stdout="some stdout", stderr="some stderr"),
+        ),
+        pytest.raises(RuntimeError, match="Emacs clock dashboard failed"),
     ):
-        with pytest.raises(RuntimeError, match="Emacs clock dashboard failed"):
-            render_clock_dashboard(
-                cfg,
-                day=date(2026, 8, 5),
-                day_total_day=date(2026, 8, 5),
-                week_start=date(2026, 8, 3),
-            )
+        render_clock_dashboard(
+            cfg,
+            day=date(2026, 8, 5),
+            day_total_day=date(2026, 8, 5),
+            week_start=date(2026, 8, 3),
+        )
 
 
 def test_dashboard_payload_requires_marker() -> None:
@@ -457,12 +461,14 @@ def test_clock_dashboard_endpoint_resolves_selected_date_to_week(tmp_path: Path)
     )
 
     try:
-        with patch("org_timeviz.server.render_clock_dashboard", return_value=expected) as render:
-            with urlopen(
+        with (
+            patch("org_timeviz.server.render_clock_dashboard", return_value=expected) as render,
+            urlopen(
                 f"{base_url}/clock-dashboard?date=2026-08-05"
                 "&day_total_date=2026-08-06&week_date=2026-08-05"
-            ) as response:
-                payload = json.loads(response.read().decode("utf-8"))
+            ) as response,
+        ):
+            payload = json.loads(response.read().decode("utf-8"))
         assert response.status == 200
         assert payload["week_start"] == "2026-08-03"
         render.assert_called_once()
@@ -497,12 +503,14 @@ def test_clock_dashboard_endpoint_reports_export_failure(tmp_path: Path) -> None
     server, thread, base_url = _start_server(cfg, output_dir)
 
     try:
-        with patch("org_timeviz.server.render_clock_dashboard", side_effect=RuntimeError("boom")):
-            with pytest.raises(HTTPError) as error:
-                urlopen(
-                    f"{base_url}/clock-dashboard?date=2026-08-05"
-                    "&day_total_date=2026-08-06&week_date=2026-08-05"
-                )
+        with (
+            patch("org_timeviz.server.render_clock_dashboard", side_effect=RuntimeError("boom")),
+            pytest.raises(HTTPError) as error,
+        ):
+            urlopen(
+                f"{base_url}/clock-dashboard?date=2026-08-05"
+                "&day_total_date=2026-08-06&week_date=2026-08-05"
+            )
         assert error.value.code == 500
     finally:
         _stop_server(server, thread)

@@ -1,9 +1,9 @@
 """Clip clock intervals to time windows and apply tag/task filters."""
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterable
 
 from .config import FiltersConfig
 from .models import ClockRecord
