@@ -74,24 +74,36 @@
       (mapcar (lambda (row) (org-timeviz-dashboard--render-row row widths)) rows))
      "\n")))
 
-(defun org-timeviz-dashboard--suspect-text (files)
-  "Render clock-line issues across FILES.
+(defun org-timeviz-dashboard--suspect-text (files intervals)
+  "Render clock-line issues across FILES and repeated clocks among INTERVALS.
 Overlapping intervals are reported separately as structured records."
-  (let ((issue-rows
-         (mapcar
-          (lambda (row)
-            (list (nth 0 row)
-                  (org-timeviz-dashboard--link-description (nth 1 row))
-                  (nth 2 row)
-                  (nth 3 row)
-                  (nth 4 row)))
-          (my/org-clock-suspects files))))
-    (if issue-rows
-        (concat
-         "Clock-line issues:\n"
-         (org-timeviz-dashboard--render-table
-          '("File" "Heading" "Issue" "Clock line" "Details")
-          issue-rows))
+  (let* ((issue-rows
+          (mapcar
+           (lambda (row)
+             (list (nth 0 row)
+                   (org-timeviz-dashboard--link-description (nth 1 row))
+                   (nth 2 row)
+                   (nth 3 row)
+                   (nth 4 row)))
+           (my/org-clock-suspects files)))
+         (duplicate-rows (org-timeviz-dashboard--duplicate-rows intervals))
+         (sections
+          (delq nil
+                (list
+                 (when issue-rows
+                   (concat
+                    "Clock-line issues:\n"
+                    (org-timeviz-dashboard--render-table
+                     '("File" "Heading" "Issue" "Clock line" "Details")
+                     issue-rows)))
+                 (when duplicate-rows
+                   (concat
+                    "Possible duplicate clocks, each still counted in all totals:\n"
+                    (org-timeviz-dashboard--render-table
+                     '("Heading" "Interval" "Location" "Duplicate location")
+                     duplicate-rows)))))))
+    (if sections
+        (mapconcat #'identity sections "\n\n")
       "All CLOCK lines look standard.")))
 
 (defun org-timeviz-dashboard--timestamp-identity (timestamp)
@@ -158,6 +170,40 @@ clocks."
 (defun org-timeviz-dashboard--task-label (row)
   "Format interval ROW's file and heading."
   (format "%s: %s" (nth 2 row) (nth 3 row)))
+
+(defun org-timeviz-dashboard--location-label (row)
+  "Format interval ROW's CLOCK line as FILE:LINE."
+  (format "%s:%s" (nth 2 row) (nth 5 row)))
+
+(defun org-timeviz-dashboard--duplicate-rows (intervals)
+  "Return table rows for closed INTERVALS that repeat another CLOCK line.
+Two CLOCK lines with the same timestamps under the same heading text are most
+likely one entry recorded twice, for example a task left in an active file
+after it was also archived.  Legitimate overlaps of different headings are not
+reported.  Each pair lists the smaller file name and line first, so an active
+file comes before its archive.  INTERVALS must be sorted by start, as returned
+by `org-timeviz-dashboard--all-intervals'."
+  (let ((rows '()))
+    (cl-loop
+     for (row . later) on intervals
+     do (cl-loop
+         for other in later
+         while (= (nth 0 other) (nth 0 row))
+         when (and (nth 8 row)
+                   (equal (nth 7 other) (nth 7 row))
+                   (equal (nth 8 other) (nth 8 row))
+                   (equal (nth 3 other) (nth 3 row)))
+         do (let ((pair (sort (list row other)
+                              (lambda (left right)
+                                (org-timeviz-dashboard--key<
+                                 (list (nth 2 left) (nth 5 left))
+                                 (list (nth 2 right) (nth 5 right)))))))
+              (push (list (org-timeviz-dashboard--link-description (nth 3 row))
+                          (org-timeviz-dashboard--interval-label row)
+                          (org-timeviz-dashboard--location-label (nth 0 pair))
+                          (org-timeviz-dashboard--location-label (nth 1 pair)))
+                    rows))))
+    (nreverse rows)))
 
 (defun org-timeviz-dashboard--display-key (row)
   "Return the key ordering interval ROW within a displayed overlap pair.
@@ -300,7 +346,7 @@ scan.  The user's `org-agenda-files' is neither used nor changed."
          (day-total-rows (my/org-clocklog-rows day-total-day files))
          (intervals (org-timeviz-dashboard--all-intervals files))
          (payload
-          `((suspects . ,(org-timeviz-dashboard--suspect-text files))
+          `((suspects . ,(org-timeviz-dashboard--suspect-text files intervals))
             (overlaps . ,(org-timeviz-dashboard--overlap-records intervals))
             (chronological . ,(org-timeviz-dashboard--clocklog-text day day-rows))
             (day_total . ,(org-timeviz-dashboard--day-total day-total-rows))

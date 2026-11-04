@@ -461,3 +461,80 @@ def test_overlap_approval_survives_archiving_but_not_a_stale_copy(
         any("shares its Org ID and interval" in reason for reason in item.reasons)
         for item in involving_review
     )
+
+
+# Duplicate CLOCK records -----------------------------------------------------
+
+
+def _duplicate_rows(suspects: str) -> list[list[str]]:
+    """Return the cells of the dashboard's duplicate-clock table."""
+    _, _, table = suspects.partition("Possible duplicate clocks")
+    return [
+        [cell.strip() for cell in line.strip("|").split("|")]
+        for line in table.splitlines()[3:]
+        if line.startswith("| ")
+    ]
+
+
+@requires_emacs
+def test_stale_active_copies_of_archived_clocks_are_counted_and_reported(
+    dashboard_workspace: tuple[AppConfig, Path], time_buckets: TimeBucketsConfig
+) -> None:
+    cfg, work = dashboard_workspace
+    archive = _archive_subtrees(work, ARCHIVED_HEADINGS, ARCHIVE_SETUPS["archive-itags"])
+    # Restoring the active file leaves a stale copy of each archived clock.
+    work.write_text(WORK_ORG, encoding="utf-8")
+
+    records = parse_org_clock_records_emacs(resolve_org_inputs(cfg).org_files)
+    dashboard = _render_dashboard(cfg)
+
+    # Nothing is deduplicated: 6 active, 4 archived, and 1 vacation record count.
+    assert len(records) == 11
+    aggregates = compute_aggregates(clip_to_window(records, ALL_OF_2026), time_buckets)
+    assert aggregates.minutes_total == 375 + 255 + 540
+    # 9:00 vacation + 1:30 review twice + 1:00 active work on Monday.
+    assert dashboard.day_total == "13:00"
+    assert [
+        (heading, interval, location.split(":")[0], duplicate.split(":")[0])
+        for heading, interval, location, duplicate in _duplicate_rows(dashboard.suspects)
+    ] == [
+        ("Nested review", "2026-03-02 09:00--2026-03-02 10:30", "work.org", archive.name),
+        ("Client call", "2026-03-03 09:00--2026-03-03 09:45", "work.org", archive.name),
+        ("Nested review", "2026-03-04 13:00--2026-03-04 14:00", "work.org", archive.name),
+        ("Design", "2026-03-06 10:00--2026-03-06 11:00", "work.org", archive.name),
+    ]
+
+
+@requires_emacs
+def test_only_repeated_clocks_of_the_same_heading_are_reported_as_duplicates(
+    tmp_path: Path,
+) -> None:
+    clock = "CLOCK: [2026-03-02 Mon {}]--[2026-03-02 Mon {}] =>  {}\n"
+    org_file = tmp_path / "leave.org"
+    org_file.write_text(
+        # Different headings with the same interval are a legitimate overlap.
+        "* Vacation\n"
+        + clock.format("08:00", "17:00", "9:00")
+        + "* Sick leave\n"
+        + clock.format("08:00", "17:00", "9:00")
+        # A CLOCK line pasted twice under one heading is a duplicate.
+        + "* Standup\n"
+        + 2 * clock.format("09:00", "09:15", "0:15")
+        # Open clocks have no end to repeat.
+        + "* Open task\nCLOCK: [2026-03-02 Mon 18:00]\nCLOCK: [2026-03-02 Mon 18:00]\n",
+        encoding="utf-8",
+    )
+    init_path = tmp_path / "init-org.el"
+    write_dashboard_init(init_path, [org_file])
+    sources = {
+        "mode": "explicit",
+        "explicit_files": [str(org_file)],
+        "emacs_init_paths": [str(init_path)],
+    }
+
+    dashboard = _render_dashboard(_app_config(tmp_path / "outputs", sources))
+
+    assert _duplicate_rows(dashboard.suspects) == [
+        ["Standup", "2026-03-02 09:00--2026-03-02 09:15", "leave.org:6", "leave.org:7"]
+    ]
+    assert len(dashboard.overlaps) == 7

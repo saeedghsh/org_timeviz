@@ -41,11 +41,13 @@ plots with:
 
 * suspicious clocks across the configured Org files and their
   [archives](#org-archive-files): malformed lines, open clocks,
-  and declared-duration mismatches as text, followed by an interactive table of
-  overlapping intervals. Each overlapping pair shows the `file:line` of both
-  `CLOCK:` lines for navigation; line numbers change as Org files are edited,
-  so they are display-only. Intentional overlaps can be approved and hidden;
-  see [Approving intentional overlaps](#approving-intentional-overlaps).
+  declared-duration mismatches, and possible duplicates (two `CLOCK:` lines
+  with the same timestamps under the same heading text) as text, followed by an
+  interactive table of overlapping intervals. Each overlapping pair shows the
+  `file:line` of both `CLOCK:` lines for navigation; line numbers change as Org
+  files are edited, so they are display-only. Intentional overlaps can be
+  approved and hidden; see
+  [Approving intentional overlaps](#approving-intentional-overlaps).
 * chronological clock entries for a selected day, including gaps between entries
 * total logged time for an independently selected day
 * total logged time for the Monday-to-Sunday week containing a selected date
@@ -231,8 +233,10 @@ never modified.
 Archiving keeps a heading's `ID` property and its `CLOCK` timestamps, so an
 [approved overlap](#approving-intentional-overlaps) stays approved when one of
 its tasks is archived. If a copy of the task is left in the active file as
-well, both copies are counted and the overlap can no longer be approved,
-because its identity is ambiguous.
+well, both copies are counted, the clock dashboard lists each repeated clock as
+a possible duplicate, and the overlap can no longer be approved because its
+identity is ambiguous. Records are never deduplicated automatically, since
+overlapping clocks can be legitimate.
 
 ## Configuration
 
