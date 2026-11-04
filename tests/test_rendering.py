@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import date, datetime
 from pathlib import Path
 
@@ -219,7 +220,15 @@ def test_timeseries_and_summary_outputs(tmp_path: Path, bucket_cfg: TimeBucketsC
     html_text = html.read_text(encoding="utf-8")
     payload = json.loads(summary.read_text(encoding="utf-8"))
     assert "Plotly.newPlot" in html_text
-    assert "Weekly avg / workday" in html_text
+    figure_match = re.search(r"const figure = (.*);\n", html_text)
+    assert figure_match is not None
+    figure = json.loads(figure_match.group(1))
+    assert [trace["name"] for trace in figure["data"]] == [
+        "Daily total",
+        "Weekly avg / workday (7d)",
+        "Monthly avg / workday (30d)",
+        "All-time avg / workday",
+    ]
     assert payload["hours_total"] == pytest.approx(3.0)
     assert payload["minutes_by_task_top50"] == {"A": 60.0, "B": 120.0}
 
