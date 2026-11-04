@@ -7,93 +7,66 @@ help: ## Show available targets
 ########################################
 ########################################
 ########################################
-ENV_FILE ?= environment.yaml
-# Reads the first top-level `name:` from environment.yaml (e.g., `name: org_timeviz`)
-ENV_NAME ?= $(shell awk -F: '/^name:/{gsub(/^[ \t]+/, "", $$2); print $$2; exit}' $(ENV_FILE))
-
-CONDA ?= conda
+UV ?= uv
 SERVE_PORT ?= 8000
 
-RUN_IN_CONDA_ENV = $(CONDA) run -n $(ENV_NAME) --no-capture-output
+# `uv run` creates or updates .venv from uv.lock before running a command.
+# --locked fails instead of rewriting uv.lock when it is out of date.
+UV_RUN = $(UV) run --locked
 
-.PHONY: ensure-env
-ensure-env: ## Ensure the conda env exists (create it if missing).
-	@$(CONDA) env list | awk '{print $$1}' | grep -Fxq "$(ENV_NAME)" \
-		&& echo "conda env '$(ENV_NAME)' already exists." \
-		|| (echo "conda env '$(ENV_NAME)' not found; creating..." && $(MAKE) create-env)
+.PHONY: sync
+sync: ## Create or update .venv from uv.lock, including development tools.
+	@$(UV) sync --locked
 
 .PHONY: run
-run: ensure-env ## Generate reports inside the repo conda env.
-	@$(RUN_IN_CONDA_ENV) python -m org_timeviz
+run: ## Generate reports.
+	@$(UV_RUN) python -m org_timeviz
 
 .PHONY: serve
-serve: ensure-env ## Generate and serve reports with browser refresh support.
-	@$(RUN_IN_CONDA_ENV) python -m org_timeviz.server --port $(SERVE_PORT)
+serve: ## Generate and serve reports with browser refresh support.
+	@$(UV_RUN) python -m org_timeviz.server --port $(SERVE_PORT)
 
 .PHONY: other_catalogue
-other_catalogue: ensure-env ## Write CSV of unmapped tags contributing to the other time bucket.
-	@$(RUN_IN_CONDA_ENV) python -m org_timeviz.other_catalogue
-
-########################################
-###################### CONDA ENVIRONMENT
-########################################
-.PHONY: ensure-mamba
-ensure-mamba: ## Ensure mamba is installed in the conda base environment.
-	@conda list -n base mamba 1>/dev/null 2>&1 \
-		&& echo "mamba already installed in conda base." \
-		|| (echo "Installing mamba into conda base..." && conda install -n base -c conda-forge -y mamba)
-
-.PHONY: create-env
-create-env: ensure-mamba ## Create the conda environment for this repo.
-	@echo "\n=== Creating conda virtual environment (using mamba) ==="
-	ulimit -n 262144 && mamba env create -f environment.yaml
-
-# syncs with environment.yaml
-# does not update existing environment even if it is outdated and ignores lock file if it exists
-.PHONY: update-env
-update-env: ensure-mamba ## Update the conda environment to match the repo dependencies.
-	@echo "\n=== Updating conda virtual environment (using mamba) ==="
-	ulimit -n 262144 && mamba env update -f environment.yaml
+other_catalogue: ## Write CSV of unmapped tags contributing to the other time bucket.
+	@$(UV_RUN) python -m org_timeviz.other_catalogue
 
 ########################################
 ################### CODE QUALITY TARGETS
 ########################################
 .PHONY: test
-test: ensure-env
+test:
 	@echo "\n=== Running tests ==="
-	@$(RUN_IN_CONDA_ENV) pytest --cov=. --cov-report html:output/htmlcov
+	@$(UV_RUN) pytest --cov=. --cov-report html:output/htmlcov
 
 .PHONY: coverage
-coverage: ensure-env
+coverage:
 	@echo "\n=== Generating coverage report ==="
-	@$(RUN_IN_CONDA_ENV) coverage report -m
+	@$(UV_RUN) coverage report -m
 
 .PHONY: formatter
-formatter: ensure-env ## Check code formatting with Ruff.
+formatter: ## Check code formatting with Ruff.
 	@echo "\n=== Checking code formatting ==="
-	@$(RUN_IN_CONDA_ENV) ruff format --check .
+	@$(UV_RUN) ruff format --check .
 
 .PHONY: format
-format: ensure-env ## Format Python code with Ruff.
+format: ## Format Python code with Ruff.
 	@echo "\n=== Formatting Python files ==="
-	@$(RUN_IN_CONDA_ENV) ruff format .
+	@$(UV_RUN) ruff format .
 
 .PHONY: linter
-linter: ensure-env ## Run Ruff lint checks.
+linter: ## Run Ruff lint checks.
 	@echo "\n=== Linting Python files ==="
-	@$(RUN_IN_CONDA_ENV) ruff check .
+	@$(UV_RUN) ruff check .
 
 .PHONY: lint-fix
-lint-fix: ensure-env ## Apply Ruff's safe automatic lint fixes.
+lint-fix: ## Apply Ruff's safe automatic lint fixes.
 	@echo "\n=== Applying Ruff lint fixes ==="
-	@$(RUN_IN_CONDA_ENV) ruff check --fix .
-
-MYPY_OPTS = --install-types --non-interactive --explicit-package-bases --config-file=pyproject.toml --show-error-codes
+	@$(UV_RUN) ruff check --fix .
 
 .PHONY: type-check
-type-check: ensure-env ## Run static type checking.
+type-check: ## Run static type checking.
 	@echo "\n=== Running type checks (all) ==="
-	@$(RUN_IN_CONDA_ENV) mypy $(MYPY_OPTS) .
+	@$(UV_RUN) mypy .
 
 .PHONY: code-quality
 code-quality: ## Run formatting, linting, typing, and unit tests.

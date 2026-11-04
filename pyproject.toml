@@ -13,6 +13,22 @@ dependencies = [
 [project.scripts]
 org-timeviz = "org_timeviz.cli:main"
 
+[dependency-groups]
+dev = [
+  "mypy>=1.19",
+  "pytest>=9.0",
+  "pytest-cov>=7.0",
+  "ruff>=0.16",
+  "types-PyYAML>=6.0",
+]
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["org_timeviz*"]
+
 [tool.setuptools.package-data]
 "org_timeviz.org_source" = ["elisp/*.el"]
 
