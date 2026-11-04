@@ -5,7 +5,8 @@ source of truth.
 
 ## What it does
 
-* Reads Org files (default: from `org-agenda-files` in `~/.emacs`)
+* Reads Org files (default: from `org-agenda-files` in `~/.emacs`) and their
+  archive files
 * Parses `CLOCK` lines and associates them with headline path and inherited tags
 * Applies time periods and filters from YAML config
 * Resolves configured time-bucket allocations from tags
@@ -200,6 +201,31 @@ has two columns:
 Only records that resolve fully to the configured `other_bucket` are included.
 If a record has no tags at all, it is reported under `(no-tag)`.
 
+## Org archive files
+
+Clocks of archived tasks keep counting. For every configured Org file,
+org-timeviz also reads the archive file that Org's default
+`org-archive-location` uses: the same path with `_archive` appended, for
+example `aim_flix.org_archive` for `aim_flix.org`. A missing archive is normal.
+No other files are scanned, and `org-agenda-files` is not changed, so the
+agenda and refiling in Emacs still use the active files only.
+
+`org-archive-subtree` moves a task away from the headings and `#+FILETAGS` it
+inherited tags and its category from. org-timeviz restores them from the context
+Org saves on the archived heading, so reports stay the same after archiving:
+
+* tags from `ARCHIVE_ITAGS`, together with any inherited tags copied onto the
+  heading by `(setq org-archive-subtree-add-inherited-tags t)`; each tag counts
+  once
+* the category from `ARCHIVE_CATEGORY`
+* the outline path from `ARCHIVE_OLPATH`
+
+Org records `ARCHIVE_OLPATH` without statistics cookies such as `[1/3]` and
+joins the headings with `/`, so a task under a parent heading containing either
+gets a slightly different outline path, as used by task totals and
+`reports.filters` task regexes, once archived. Archive files are only read,
+never modified.
+
 ## Configuration
 
 The config file is a single YAML (default: `configs/default.yaml`). Report types
@@ -213,7 +239,8 @@ shared filters and plot settings; it does not list report names.
   null disables approvals, and `ORG_TIMEVIZ_OVERLAP_APPROVALS_FILE` overrides it
   (see [Approving intentional overlaps](#approving-intentional-overlaps))
 * `org_sources`: where to get Org files (either from `org-agenda-files` in an
-  Emacs init file, or an explicit list)
+  Emacs init file, or an explicit list); their archive files are added
+  automatically (see [Org archive files](#org-archive-files))
 * `reports.filters`: include/exclude tags and task regex filters applied to all
   reports
 * `reports.plots`:
