@@ -11,6 +11,10 @@
 (when (boundp 'my/org-auto-resolve-dangling-clocks)
   (setq my/org-auto-resolve-dangling-clocks nil))
 
+;; Emacs visits only *.org files in Org mode by default.  Archives written by
+;; Org carry a mode line, but the scans below must not depend on it.
+(add-to-list 'auto-mode-alist '("\\.org_archive\\'" . org-mode))
+
 (defconst org-timeviz-dashboard--json-prefix "ORG_TIMEVIZ_CLOCK_DASHBOARD_JSON:")
 
 (defun org-timeviz-dashboard--require-helper (symbol)
@@ -70,8 +74,8 @@
       (mapcar (lambda (row) (org-timeviz-dashboard--render-row row widths)) rows))
      "\n")))
 
-(defun org-timeviz-dashboard--suspect-text ()
-  "Render clock-line issues across agenda files.
+(defun org-timeviz-dashboard--suspect-text (files)
+  "Render clock-line issues across FILES.
 Overlapping intervals are reported separately as structured records."
   (let ((issue-rows
          (mapcar
@@ -81,7 +85,7 @@ Overlapping intervals are reported separately as structured records."
                   (nth 2 row)
                   (nth 3 row)
                   (nth 4 row)))
-          (my/org-clock-suspects (org-agenda-files)))))
+          (my/org-clock-suspects files))))
     (if issue-rows
         (concat
          "Clock-line issues:\n"
@@ -97,8 +101,8 @@ Overlapping intervals are reported separately as structured records."
             (nth 5 parsed) (nth 4 parsed) (nth 3 parsed)
             (nth 2 parsed) (nth 1 parsed))))
 
-(defun org-timeviz-dashboard--all-intervals ()
-  "Collect closed and open clock intervals from all agenda files.
+(defun org-timeviz-dashboard--all-intervals (files)
+  "Collect closed and open clock intervals from FILES.
 Each row is (START END FILE HEADING OPEN LINE ORG-ID START-STAMP END-STAMP).
 LINE is the 1-based line number of the CLOCK line itself.  ORG-ID is the
 owning heading's own ID property, or nil; it is never created here.
@@ -107,7 +111,7 @@ by `org-timeviz-dashboard--timestamp-identity'; END-STAMP is nil for open
 clocks."
   (let ((rows '())
         (now (float-time (current-time))))
-    (dolist (file (org-agenda-files))
+    (dolist (file files)
       (with-current-buffer (find-file-noselect file)
         (save-excursion
           (goto-char (point-min))
@@ -189,12 +193,13 @@ order never depends on which interval the overlap scan found first."
     (start . ,(nth 7 row))
     (end . ,(nth 8 row))))
 
-(defun org-timeviz-dashboard--overlap-records ()
-  "Return a JSON-ready vector describing every pair of overlapping intervals.
-Task A is the interval with the shorter task label."
+(defun org-timeviz-dashboard--overlap-records (intervals)
+  "Return a JSON-ready vector describing every pair of overlapping INTERVALS.
+INTERVALS are rows from `org-timeviz-dashboard--all-intervals'.  Task A is
+the interval with the shorter task label."
   (let ((active '())
         (overlaps '()))
-    (dolist (row (org-timeviz-dashboard--all-intervals))
+    (dolist (row intervals)
       (setq active
             (cl-remove-if
              (lambda (other) (<= (nth 1 other) (nth 0 row)))
@@ -258,8 +263,8 @@ Task A is the interval with the shorter task label."
             (nth 0 gregorian)
             (nth 1 gregorian))))
 
-(defun org-timeviz-dashboard--week-total (week-start-str)
-  "Return total logged duration for the seven days from WEEK-START-STR."
+(defun org-timeviz-dashboard--week-total (week-start-str files)
+  "Return total logged duration in FILES for the seven days from WEEK-START-STR."
   (let ((total 0.0))
     (dotimes (offset 7)
       (setq total
@@ -267,11 +272,17 @@ Task A is the interval with the shorter task label."
                (org-timeviz-dashboard--rows-minutes
                 (my/org-clocklog-rows
                  (org-timeviz-dashboard--date-plus-days week-start-str offset)
-                 (org-agenda-files))))))
+                 files)))))
     (my/org-clocklog--fmt-dur total)))
 
+(defun org-timeviz-dashboard--date-argument-p (value)
+  "Return non-nil when command-line argument VALUE is a YYYY-MM-DD date."
+  (string-match-p "^[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}$" value))
+
 (defun org-timeviz-dashboard-main ()
-  "Emit one marked JSON dashboard payload using command-line date arguments."
+  "Emit one marked JSON dashboard payload.
+The command-line arguments are the report dates followed by the Org files to
+scan.  The user's `org-agenda-files' is neither used nor changed."
   (mapc #'org-timeviz-dashboard--require-helper
         '(my/org-clock-suspects
           my/org--collect-ts-pos
@@ -279,22 +290,24 @@ Task A is the interval with the shorter task label."
           my/org-clocklog-rows
           my/org-clocklog--fmt-hhmm
           my/org-clocklog--fmt-dur))
-  (let* ((args (cl-remove-if-not
-                (lambda (value)
-                  (and (stringp value)
-                       (string-match-p "^[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}$" value)))
-                command-line-args-left))
-         (day (or (nth 0 args) (format-time-string "%Y-%m-%d")))
-         (day-total-day (or (nth 1 args) day))
-         (week-start (or (nth 2 args) day))
-         (day-rows (my/org-clocklog-rows day (org-agenda-files)))
-         (day-total-rows (my/org-clocklog-rows day-total-day (org-agenda-files)))
+  (let* ((args (remove "--" command-line-args-left))
+         (dates (cl-remove-if-not #'org-timeviz-dashboard--date-argument-p args))
+         (files (cl-remove-if #'org-timeviz-dashboard--date-argument-p args))
+         (day (or (nth 0 dates) (format-time-string "%Y-%m-%d")))
+         (day-total-day (or (nth 1 dates) day))
+         (week-start (or (nth 2 dates) day))
+         (day-rows (my/org-clocklog-rows day files))
+         (day-total-rows (my/org-clocklog-rows day-total-day files))
+         (intervals (org-timeviz-dashboard--all-intervals files))
          (payload
-          `((suspects . ,(org-timeviz-dashboard--suspect-text))
-            (overlaps . ,(org-timeviz-dashboard--overlap-records))
+          `((suspects . ,(org-timeviz-dashboard--suspect-text files))
+            (overlaps . ,(org-timeviz-dashboard--overlap-records intervals))
             (chronological . ,(org-timeviz-dashboard--clocklog-text day day-rows))
             (day_total . ,(org-timeviz-dashboard--day-total day-total-rows))
-            (week_total . ,(org-timeviz-dashboard--week-total week-start)))))
+            (week_total . ,(org-timeviz-dashboard--week-total week-start files)))))
+    ;; Consumed here, so Emacs does not visit the files again after this script,
+    ;; which could prompt if one was saved meanwhile.
+    (setq command-line-args-left nil)
     (princ org-timeviz-dashboard--json-prefix)
     (princ (json-encode payload))
     (princ "\n")))

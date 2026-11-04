@@ -8,6 +8,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from ..config import AppConfig
+from .inputs import resolve_org_inputs
 
 _LOG = logging.getLogger(__name__)
 DASHBOARD_JSON_PREFIX = "ORG_TIMEVIZ_CLOCK_DASHBOARD_JSON:"
@@ -74,6 +75,12 @@ def render_clock_dashboard(
     script_path = Path(__file__).resolve().parent / "elisp" / "clock_dashboard_export.el"
     if not script_path.exists():
         raise FileNotFoundError(f"Missing clock dashboard exporter: {script_path}")
+    # Scan the same active and archive files as the reports, not `org-agenda-files`.
+    org_files = [
+        path.expanduser().resolve()
+        for path in resolve_org_inputs(cfg).org_files
+        if path.expanduser().exists()
+    ]
 
     cmd = [
         "emacs",
@@ -87,6 +94,7 @@ def render_clock_dashboard(
         day.isoformat(),
         day_total_day.isoformat(),
         week_start.isoformat(),
+        *[str(path) for path in org_files],
     ]
     _LOG.info(
         "Running Emacs clock dashboard for chronological_day=%s day_total_day=%s week=%s",

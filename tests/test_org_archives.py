@@ -4,18 +4,25 @@ import json
 import shutil
 import subprocess
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
+from conftest import write_dashboard_init
 
 from org_timeviz.aggregate import Aggregates, compute_aggregates
 from org_timeviz.config import AppConfig, TimeBucketsConfig
 from org_timeviz.filters import clip_to_window
 from org_timeviz.models import ClockRecord
 from org_timeviz.org_source import emacs as emacs_source
+from org_timeviz.org_source.clock_dashboard import (
+    ClockDashboard,
+    ClockOverlap,
+    render_clock_dashboard,
+)
 from org_timeviz.org_source.emacs import parse_org_clock_records_emacs
 from org_timeviz.org_source.inputs import resolve_org_inputs
+from org_timeviz.overlap_approvals import ApprovalStore, OverlapApprovals
 from org_timeviz.rendering.monthly_time_buckets import (
     MonthlyTimeBuckets,
     compute_monthly_time_buckets,
@@ -337,3 +344,120 @@ def test_reports_are_identical_after_archiving_tasks(tmp_path: Path, mode: str) 
     assert summary["minutes_by_time_bucket"] == EXPECTED_BUCKET_MINUTES
     assert _output_files(tmp_path / "after") == before
     assert archive.read_bytes() == archive_bytes
+
+
+# Live clock dashboard and overlap approvals ----------------------------------
+
+LEAVE_ORG = """\
+* Vacation                                                           :vacation:
+:PROPERTIES:
+:ID:       vacation-id
+:END:
+:LOGBOOK:
+CLOCK: [2026-03-02 Mon 08:00]--[2026-03-02 Mon 17:00] =>  9:00
+:END:
+"""
+# Reports every file it is given, to show which files the clock checks scan.
+SCANNED_FILES_SUSPECTS = """
+(defun my/org-clock-suspects (files)
+  (mapcar (lambda (file) (list (file-name-nondirectory file) "-" "scanned" "-" "-"))
+          files))
+"""
+
+
+@pytest.fixture
+def dashboard_workspace(tmp_path: Path) -> tuple[AppConfig, Path]:
+    """Return a config whose `org-agenda-files` lists only the active files."""
+    work = tmp_path / "work.org"
+    work.write_text(WORK_ORG, encoding="utf-8")
+    leave = tmp_path / "leave.org"
+    leave.write_text(LEAVE_ORG, encoding="utf-8")
+    init_path = tmp_path / "init-org.el"
+    write_dashboard_init(init_path, [work, leave])
+    with init_path.open("a", encoding="utf-8") as handle:
+        handle.write(SCANNED_FILES_SUSPECTS)
+    sources = {"mode": "emacs", "emacs_init_paths": [str(init_path)]}
+    return _app_config(tmp_path / "outputs", sources), work
+
+
+def _render_dashboard(cfg: AppConfig) -> ClockDashboard:
+    return render_clock_dashboard(
+        cfg, day=date(2026, 3, 2), day_total_day=date(2026, 3, 2), week_start=date(2026, 3, 2)
+    )
+
+
+def _identities(overlaps: tuple[ClockOverlap, ...]) -> list[tuple[str | None, ...]]:
+    return [
+        (clock.org_id, clock.start, clock.end)
+        for overlap in overlaps
+        for clock in (overlap.a, overlap.b)
+    ]
+
+
+@requires_emacs
+@pytest.mark.parametrize("mode_line", [True, False], ids=["org-archive", "no-mode-line"])
+def test_dashboard_reads_active_and_archived_clocks(
+    dashboard_workspace: tuple[AppConfig, Path], mode_line: bool
+) -> None:
+    cfg, work = dashboard_workspace
+    before = _render_dashboard(cfg)
+
+    archive = _archive_subtrees(work, ARCHIVED_HEADINGS, ARCHIVE_SETUPS["archive-itags"])
+    if not mode_line:
+        archive.write_text(archive.read_text(encoding="utf-8").split("\n", 1)[1], encoding="utf-8")
+    org_bytes = {path: path.read_bytes() for path in work.parent.glob("*.org*")}
+    after = _render_dashboard(cfg)
+
+    # 9:00 vacation + 1:30 archived review + 1:00 active work on Monday; the week
+    # adds the archived Tuesday call, Wednesday review, and Friday design clocks.
+    assert (after.day_total, after.week_total) == (before.day_total, before.week_total)
+    assert (after.day_total, after.week_total) == ("11:30", "14:15")
+    assert after.chronological == before.chronological
+    assert "Nested review" in after.chronological
+    assert _identities(after.overlaps) == _identities(before.overlaps)
+    assert [overlap.b.task for overlap in after.overlaps] == [
+        "work.org_archive: Nested review",
+        "work.org: Ongoing work",
+    ]
+    assert "work.org_archive" not in before.suspects
+    assert "| work.org_archive | -       | scanned |" in after.suspects
+    assert {path: path.read_bytes() for path in org_bytes} == org_bytes
+
+
+@requires_emacs
+def test_overlap_approval_survives_archiving_but_not_a_stale_copy(
+    dashboard_workspace: tuple[AppConfig, Path], tmp_path: Path
+) -> None:
+    cfg, work = dashboard_workspace
+    approvals = OverlapApprovals(ApprovalStore(tmp_path / "approved_overlaps.json"))
+    [review_overlap] = [
+        item
+        for item in approvals.review(_render_dashboard(cfg).overlaps).overlaps
+        if item.overlap.b.task == "work.org: Nested review"
+    ]
+    assert review_overlap.pair is not None
+    approvals.set_approved(review_overlap.pair, True)
+
+    # The archived heading keeps its ID and CLOCK timestamps, so its identity is unchanged.
+    _archive_subtrees(work, ARCHIVED_HEADINGS, ARCHIVE_SETUPS["archive-itags"])
+    archived = approvals.review(_render_dashboard(cfg).overlaps).overlaps
+    assert [(item.overlap.b.task, item.status, item.pair) for item in archived] == [
+        ("work.org_archive: Nested review", "approved", review_overlap.pair),
+        ("work.org: Ongoing work", "blocked", None),
+    ]
+
+    # A stale copy left in the active file makes the identity ambiguous again.
+    work.write_text(WORK_ORG, encoding="utf-8")
+    stale = approvals.review(_render_dashboard(cfg).overlaps).overlaps
+    involving_review = [
+        item
+        for item in stale
+        if "Nested review" in item.overlap.a.task or "Nested review" in item.overlap.b.task
+    ]
+    # Each copy overlaps the vacation, and each of the two review clocks its copy.
+    assert len(involving_review) == 4
+    assert all(item.status == "blocked" for item in involving_review)
+    assert all(
+        any("shares its Org ID and interval" in reason for reason in item.reasons)
+        for item in involving_review
+    )

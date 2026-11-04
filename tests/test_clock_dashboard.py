@@ -28,13 +28,17 @@ from org_timeviz.server import _build_server
 requires_emacs = pytest.mark.skipif(shutil.which("emacs") is None, reason="Emacs is not installed")
 
 
-def _app_config(output_dir: Path, init_paths: list[Path] | None = None) -> AppConfig:
+def _app_config(
+    output_dir: Path,
+    init_paths: list[Path] | None = None,
+    org_files: list[Path] | None = None,
+) -> AppConfig:
     return AppConfig.model_validate(
         {
             "app": {"output_dir": str(output_dir), "log_level": "INFO"},
             "org_sources": {
                 "mode": "explicit",
-                "explicit_files": [],
+                "explicit_files": [str(path) for path in (org_files or [])],
                 "emacs_init_paths": [str(path) for path in (init_paths or [])],
             },
             "time_buckets": {
@@ -234,7 +238,7 @@ def _render_dashboard(tmp_path: Path, org_texts: dict[str, str]) -> ClockDashboa
     init_path = tmp_path / "init-org.el"
     write_dashboard_init(init_path, org_files)
     return render_clock_dashboard(
-        _app_config(tmp_path / "outputs", [init_path]),
+        _app_config(tmp_path / "outputs", [init_path], org_files),
         day=date(2026, 8, 5),
         day_total_day=date(2026, 8, 5),
         week_start=date(2026, 8, 3),
