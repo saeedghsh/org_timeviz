@@ -108,18 +108,18 @@ Identity uses local timestamp components, never file, label or line number."
     (cl-stable-sort rows #'< :key #'car)))
 
 (defun org-timeviz-dashboard--day-rows (day intervals)
-  "Clip closed INTERVALS to DAY, retaining duplicates and overlaps."
+  "Clip INTERVALS to DAY, retaining live clocks, duplicates and overlaps.
+Preserve the historical dashboard boundary at 23:59:59, not midnight."
   (let* ((start (float-time (org-time-string-to-time (concat day " 00:00"))))
-         (end (float-time
-               (org-time-string-to-time
-                (concat (org-timeviz-dashboard--date-plus-days day 1) " 00:00"))))
+         (end (1- (float-time
+                   (org-time-string-to-time
+                    (concat (org-timeviz-dashboard--date-plus-days day 1) " 00:00")))))
          rows)
     (dolist (row intervals)
-      (unless (nth 4 row)
-        (let ((left (max start (nth 0 row)))
-              (right (min end (nth 1 row))))
-          (when (< left right)
-            (push (list left right (/ (- right left) 60.0) (nth 3 row)) rows)))))
+      (let ((left (max start (nth 0 row)))
+            (right (min end (nth 1 row))))
+        (when (< left right)
+          (push (list left right (/ (- right left) 60.0) (nth 3 row)) rows))))
     (nreverse rows)))
 
 (defun org-timeviz-dashboard--fmt-hhmm (seconds)

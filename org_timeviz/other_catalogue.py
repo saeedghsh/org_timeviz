@@ -28,7 +28,7 @@ def generate_other_catalogue(cfg: AppConfig) -> Path:
     inputs = resolve_org_inputs(cfg)
     _LOG.info("Using %s org file(s)", len(inputs.org_files))
 
-    configure_emacs_init(cfg, inputs.agenda_init_path)
+    configure_emacs_init(cfg, inputs.agenda_init_path, todo_keywords=inputs.todo_keywords)
 
     records = parse_org_clock_records_emacs(org_files=inputs.org_files)
     out_root = Path(cfg.app.output_dir).expanduser().resolve()

@@ -1,134 +1,48 @@
-"""Read org-agenda-files and Org TODO keywords from an Emacs init file."""
+"""Ask Emacs to evaluate explicitly configured, trusted agenda configuration."""
 
+import json
 import logging
-import re
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 _LOG = logging.getLogger(__name__)
+_PREFIX = "ORG_TIMEVIZ_AGENDA_JSON:"
 
 
 @dataclass(frozen=True)
 class EmacsAgendaFilesResult:
-    """Hold agenda file paths discovered from an Emacs init file."""
+    """Hold effective agenda paths and TODO keywords from a trusted init file."""
 
     files: list[Path]
     source_path: Path
+    todo_keywords: list[str]
 
 
 def read_agenda_files_from_emacs_init(
     init_path: Path, var_name: str
 ) -> EmacsAgendaFilesResult | None:
-    """Extract org-agenda-files from an Emacs init file, if present."""
-    if not init_path.exists():
+    """Evaluate one trusted init in an isolated batch process, not a Lisp parser.
+
+    Configuration is executable code and can have side effects. Only explicitly
+    configured files are loaded; no normal Emacs startup occurs. Errors and
+    timeouts are reported, never disguised as empty agenda lists.
+    """
+    if not init_path.is_file():
         return None
-
-    text = init_path.read_text(encoding="utf-8")
-
-    block = _find_setq_block(text, var_name=var_name)
-    if block is None:
-        return None
-
-    raw_files = _extract_double_quoted_strings(block)
-    files = [Path(s).expanduser() for s in raw_files]
-
-    _LOG.info("Read %s agenda file(s) from %s", len(files), init_path)
-    return EmacsAgendaFilesResult(files=files, source_path=init_path)
-
-
-def _find_setq_block(text: str, var_name: str) -> str | None:
-    # Find the actual (setq <var_name> ...) form, not just any mention of var_name.
-    pattern = re.compile(r"\(\s*setq\s+" + re.escape(var_name) + r"\b", flags=re.MULTILINE)
-
-    m = pattern.search(text)
-    if m is None:
-        return None
-
-    start_idx = m.start()
-
-    depth = 0
-    in_str = False
-    esc = False
-
-    i = start_idx
-    end_idx: int | None = None
-
-    while i < len(text):
-        ch = text[i]
-
-        if in_str:
-            if esc:
-                esc = False
-            elif ch == "\\":
-                esc = True
-            elif ch == '"':
-                in_str = False
-            i += 1
-            continue
-
-        # Elisp line comment outside strings: from ';' to end-of-line
-        if ch == ";":
-            while i < len(text) and text[i] != "\n":
-                i += 1
-            continue
-
-        if ch == '"':
-            in_str = True
-            i += 1
-            continue
-
-        if ch == "(":
-            depth += 1
-        elif ch == ")":
-            depth -= 1
-            if not depth:
-                end_idx = i + 1
-                break
-
-        i += 1
-
-    if end_idx is None:
-        return None
-
-    return text[start_idx:end_idx]
-
-
-def _extract_double_quoted_strings(block: str) -> list[str]:
-    strings: list[str] = []
-    i = 0
-    in_str = False
-    esc = False
-    buf: list[str] = []
-
-    while i < len(block):
-        ch = block[i]
-
-        if not in_str and ch == ";":
-            # Skip line comments outside strings
-            while i < len(block) and block[i] != "\n":
-                i += 1
-            continue
-
-        if in_str:
-            if esc:
-                buf.append(ch)
-                esc = False
-            elif ch == "\\":
-                esc = True
-            elif ch == '"':
-                strings.append("".join(buf))
-                buf = []
-                in_str = False
-            else:
-                buf.append(ch)
-            i += 1
-            continue
-
-        if ch == '"':
-            in_str = True
-            i += 1
-            continue
-
-        i += 1
-
-    return strings
+    script = Path(__file__).parent / "elisp" / "agenda_export.el"
+    command = ["emacs", "--batch", "-Q", "--load", str(script), "--", str(init_path), var_name]
+    result = subprocess.run(
+        command, check=False, capture_output=True, text=True, encoding="utf-8", timeout=30
+    )
+    if result.returncode:
+        raise RuntimeError(
+            f"Emacs configuration discovery failed for {init_path}:\n{result.stderr}"
+        )
+    for line in reversed(result.stdout.splitlines()):
+        if line.startswith(_PREFIX):
+            payload = json.loads(line.removeprefix(_PREFIX))
+            files = [Path(path).expanduser() for path in payload["files"]]
+            _LOG.info("Read %s agenda file(s) from %s", len(files), init_path)
+            return EmacsAgendaFilesResult(files, init_path, payload["todo_keywords"])
+    raise RuntimeError(f"Emacs configuration discovery emitted no payload for {init_path}")

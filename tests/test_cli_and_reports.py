@@ -64,9 +64,9 @@ def test_generate_all_reports_returns_early_without_records(
     monkeypatch.setattr(
         reports,
         "resolve_org_inputs",
-        lambda cfg: SimpleNamespace(org_files=[], agenda_init_path=None),
+        lambda cfg: SimpleNamespace(org_files=[], agenda_init_path=None, todo_keywords=None),
     )
-    monkeypatch.setattr(reports, "configure_emacs_init", lambda *args: None)
+    monkeypatch.setattr(reports, "configure_emacs_init", lambda *args, **kwargs: None)
     monkeypatch.setattr(reports, "parse_org_clock_records_emacs", lambda **kwargs: [])
     reports.generate_all_reports(cfg)
     assert not (tmp_path / "assets").exists()
@@ -96,9 +96,11 @@ def test_generate_all_reports_orchestrates_all_current_outputs(
     monkeypatch.setattr(
         reports,
         "resolve_org_inputs",
-        lambda cfg: SimpleNamespace(org_files=[Path("one.org")], agenda_init_path=None),
+        lambda cfg: SimpleNamespace(
+            org_files=[Path("one.org")], agenda_init_path=None, todo_keywords=None
+        ),
     )
-    monkeypatch.setattr(reports, "configure_emacs_init", lambda *args: None)
+    monkeypatch.setattr(reports, "configure_emacs_init", lambda *args, **kwargs: None)
     monkeypatch.setattr(reports, "parse_org_clock_records_emacs", lambda **kwargs: records)
     monkeypatch.setattr(
         reports,

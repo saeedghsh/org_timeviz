@@ -8,9 +8,10 @@ app:
 org_sources:
   mode: emacs
   emacs_init_paths:
+    # Prefer the Org-only module; avoid evaluating the full UI/package init.
+    - "~/.emacs.d/lisp/init-org.el"
     - "~/.emacs"
     - "~/.emacs.d/init.el"
-    - "~/.emacs.d/lisp/init-org.el"
   emacs_agenda_var: org-agenda-files
   explicit_files: []
 

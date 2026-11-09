@@ -56,22 +56,6 @@ def _app_config(
     )
 
 
-def _write_dashboard_init(path: Path) -> None:
-    path.write_text(
-        "\n".join(
-            [
-                "(defun my/org-clock-suspects (files) nil)",
-                "(defun my/org--collect-ts-pos (text) nil)",
-                "(defun my/org--ts->sec (timestamp) 0)",
-                "(defun my/org-clocklog-rows (&optional date files) nil)",
-                '(defun my/org-clocklog--fmt-hhmm (seconds) "00:00")',
-                '(defun my/org-clocklog--fmt-dur (minutes) "0:00")',
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-
 def _start_server(cfg: AppConfig, output_dir: Path) -> tuple[ThreadingHTTPServer, Thread, str]:
     server = _build_server(cfg, output_dir, port=0, overlap_approvals=OverlapApprovals(None))
     thread = Thread(target=server.serve_forever, daemon=True)
@@ -85,10 +69,8 @@ def _stop_server(server: ThreadingHTTPServer, thread: Thread) -> None:
     thread.join(timeout=5)
 
 
-def test_render_clock_dashboard_uses_configured_init_and_marked_json(tmp_path: Path) -> None:
-    init_path = tmp_path / "init-org.el"
-    _write_dashboard_init(init_path)
-    cfg = _app_config(tmp_path / "outputs", [init_path])
+def test_render_clock_dashboard_uses_native_exporter_and_marked_json(tmp_path: Path) -> None:
+    cfg = _app_config(tmp_path / "outputs")
     clock = {
         "task": "a.org: Task",
         "interval": "2026-08-05 09:00--2026-08-05 10:00",
@@ -120,7 +102,7 @@ def test_render_clock_dashboard_uses_configured_init_and_marked_json(tmp_path: P
 
     command = run.call_args.args[0]
     assert command[:3] == ["emacs", "--batch", "-Q"]
-    assert str(init_path.resolve()) not in command
+    assert command.count("--load") == 1
     assert command[4].endswith("clock_dashboard_export.el")
     assert command[-3:] == ["2026-08-05", "2026-08-06", "2026-08-03"]
     assert report == ClockDashboard(
@@ -161,9 +143,7 @@ def test_render_clock_dashboard_uses_configured_init_and_marked_json(tmp_path: P
 def test_render_clock_dashboard_rejects_malformed_overlaps(
     tmp_path: Path, overlaps: object
 ) -> None:
-    init_path = tmp_path / "init-org.el"
-    _write_dashboard_init(init_path)
-    cfg = _app_config(tmp_path / "outputs", [init_path])
+    cfg = _app_config(tmp_path / "outputs")
     payload = {
         "suspects": "",
         "overlaps": overlaps,
@@ -393,10 +373,8 @@ def test_overlap_records_mark_open_clocks(tmp_path: Path) -> None:
 
 @requires_emacs
 def test_render_clock_dashboard_needs_no_custom_helpers(tmp_path: Path) -> None:
-    init_path = tmp_path / "init-org.el"
-    init_path.write_text('(error "Dashboard must not load configuration")', encoding="utf-8")
     report = render_clock_dashboard(
-        _app_config(tmp_path / "outputs", [init_path]),
+        _app_config(tmp_path / "outputs"),
         day=date(2026, 8, 5),
         day_total_day=date(2026, 8, 6),
         week_start=date(2026, 8, 3),
@@ -405,9 +383,7 @@ def test_render_clock_dashboard_needs_no_custom_helpers(tmp_path: Path) -> None:
 
 
 def test_render_clock_dashboard_reports_emacs_failure(tmp_path: Path) -> None:
-    init_path = tmp_path / "init-org.el"
-    _write_dashboard_init(init_path)
-    cfg = _app_config(tmp_path / "outputs", [init_path])
+    cfg = _app_config(tmp_path / "outputs")
 
     with (
         patch(
