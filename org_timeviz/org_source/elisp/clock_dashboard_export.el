@@ -6,33 +6,14 @@
 (require 'org)
 (require 'org-id)
 
-;; Defined by the user's Emacs init file, which is loaded before this script.
-(declare-function my/org-clock-suspects "ext:init-org" (files))
-(declare-function my/org--collect-ts-pos "ext:init-org" (s))
-(declare-function my/org--ts->sec "ext:init-org" (ts))
-(declare-function my/org-clocklog-rows "ext:init-org" (&optional date-str files))
-(declare-function my/org-clocklog--fmt-hhmm "ext:init-org" (sec))
-(declare-function my/org-clocklog--fmt-dur "ext:init-org" (mins))
+(load (expand-file-name "org_timeviz_clock.el"
+                             (file-name-directory (or load-file-name buffer-file-name)))
+      nil t)
 
-;; The user's init-org.el resolves dangling clocks whenever an Org buffer opens.
-;; Dashboard reads must never mutate source Org files.
-(when (boundp 'my/org-auto-resolve-dangling-clocks)
-  (setq my/org-auto-resolve-dangling-clocks nil))
-
-;; Emacs visits only *.org files in Org mode by default.  Archives written by
-;; Org carry a mode line, but the scans below must not depend on it.
-(add-to-list 'auto-mode-alist '("\\.org_archive\\'" . org-mode))
+(declare-function org-timeviz-clock-read "org_timeviz_clock" (file &optional metadata))
+(declare-function org-timeviz-clock-identity "org_timeviz_clock" (timestamp &optional end))
 
 (defconst org-timeviz-dashboard--json-prefix "ORG_TIMEVIZ_CLOCK_DASHBOARD_JSON:")
-
-(defun org-timeviz-dashboard--require-helper (symbol)
-  "Fail clearly when the user's init file does not define SYMBOL."
-  (unless (fboundp symbol)
-    (error "Clock dashboard requires %S in the configured Emacs init file" symbol)))
-
-(defun org-timeviz-dashboard--link-description (value)
-  "Return the visible description from Org link VALUE, when present."
-  (org-link-display-format (format "%s" value)))
 
 (defun org-timeviz-dashboard--cell-string (value)
   "Convert VALUE to a single-line table cell string."
@@ -79,19 +60,10 @@
       (mapcar (lambda (row) (org-timeviz-dashboard--render-row row widths)) rows))
      "\n")))
 
-(defun org-timeviz-dashboard--suspect-text (files intervals)
-  "Render clock-line issues across FILES and repeated clocks among INTERVALS.
+(defun org-timeviz-dashboard--suspect-text (issue-rows intervals)
+  "Render clock-line issues in ISSUE-ROWS and repeated clocks among INTERVALS.
 Overlapping intervals are reported separately as structured records."
-  (let* ((issue-rows
-          (mapcar
-           (lambda (row)
-             (list (nth 0 row)
-                   (org-timeviz-dashboard--link-description (nth 1 row))
-                   (nth 2 row)
-                   (nth 3 row)
-                   (nth 4 row)))
-           (my/org-clock-suspects files)))
-         (duplicate-rows (org-timeviz-dashboard--duplicate-rows intervals))
+  (let* ((duplicate-rows (org-timeviz-dashboard--duplicate-rows intervals))
          (sections
           (delq nil
                 (list
@@ -100,7 +72,11 @@ Overlapping intervals are reported separately as structured records."
                     "Clock-line issues:\n"
                     (org-timeviz-dashboard--render-table
                      '("File" "Heading" "Issue" "Clock line" "Details")
-                     issue-rows)))
+                     (mapcar (lambda (row)
+                               (cons (car row)
+                                     (cons (org-link-display-format (nth 1 row))
+                                           (cddr row))))
+                             issue-rows))))
                  (when duplicate-rows
                    (concat
                     "Possible duplicate clocks, each still counted in all totals:\n"
@@ -111,59 +87,49 @@ Overlapping intervals are reported separately as structured records."
         (mapconcat #'identity sections "\n\n")
       "All CLOCK lines look standard.")))
 
-(defun org-timeviz-dashboard--timestamp-identity (timestamp)
-  "Return Org TIMESTAMP as a timezone-independent YYYY-MM-DDTHH:MM string."
-  (let ((parsed (org-parse-time-string timestamp)))
-    (format "%04d-%02d-%02dT%02d:%02d"
-            (nth 5 parsed) (nth 4 parsed) (nth 3 parsed)
-            (nth 2 parsed) (nth 1 parsed))))
+(defun org-timeviz-dashboard--all-intervals (clocks)
+  "Convert native CLOCKS to sorted dashboard rows.
+Rows retain (START END FILE HEADING OPEN LINE ORG-ID START-STAMP END-STAMP).
+Identity uses local timestamp components, never file, label or line number."
+  (let ((now (float-time)) rows)
+    (dolist (clock clocks)
+      (let* ((start (float-time (plist-get clock :start)))
+             (open (plist-get clock :open))
+             (end (if open now (float-time (plist-get clock :end)))))
+        (when (< start end)
+          (push (list start end
+                      (file-name-nondirectory (plist-get clock :file))
+                      (plist-get clock :heading) open (plist-get clock :line)
+                      (plist-get clock :id)
+                      (org-timeviz-clock-identity (plist-get clock :timestamp))
+                      (unless open
+                        (org-timeviz-clock-identity
+                         (plist-get clock :timestamp) t))) rows))))
+    (cl-stable-sort rows #'< :key #'car)))
 
-(defun org-timeviz-dashboard--all-intervals (files)
-  "Collect closed and open clock intervals from FILES.
-Each row is (START END FILE HEADING OPEN LINE ORG-ID START-STAMP END-STAMP).
-LINE is the 1-based line number of the CLOCK line itself.  ORG-ID is the
-owning heading's own ID property, or nil; it is never created here.
-START-STAMP and END-STAMP are the clock's timestamps as written, normalized
-by `org-timeviz-dashboard--timestamp-identity'; END-STAMP is nil for open
-clocks."
-  (let ((rows '())
-        (now (float-time (current-time))))
-    (dolist (file files)
-      (with-current-buffer (find-file-noselect file)
-        (save-excursion
-          (goto-char (point-min))
-          (while (re-search-forward "^ *CLOCK: *\\(.*\\)$" nil t)
-            (let* ((payload (match-string 1))
-                   ;; Read the line before point moves to the owning heading.
-                   (line (line-number-at-pos (match-beginning 0) t))
-                   (timestamps (my/org--collect-ts-pos payload)))
-              (when (memq (length timestamps) '(1 2))
-                (let* ((start (my/org--ts->sec (caar timestamps)))
-                       (open (= (length timestamps) 1))
-                       (end (if open
-                                now
-                              (my/org--ts->sec (caadr timestamps)))))
-                  (when (< start end)
-                    (save-excursion
-                      (condition-case nil
-                          (progn
-                            (org-back-to-heading t)
-                            (push
-                             (list start
-                                   end
-                                   (file-name-nondirectory file)
-                                   (org-get-heading t t t t)
-                                   open
-                                   line
-                                   (org-id-get)
-                                   (org-timeviz-dashboard--timestamp-identity
-                                    (caar timestamps))
-                                   (unless open
-                                     (org-timeviz-dashboard--timestamp-identity
-                                      (caadr timestamps))))
-                             rows))
-                        (error nil)))))))))))
-    (cl-sort rows #'< :key #'car)))
+(defun org-timeviz-dashboard--day-rows (day intervals)
+  "Clip closed INTERVALS to DAY, retaining duplicates and overlaps."
+  (let* ((start (float-time (org-time-string-to-time (concat day " 00:00"))))
+         (end (float-time
+               (org-time-string-to-time
+                (concat (org-timeviz-dashboard--date-plus-days day 1) " 00:00"))))
+         rows)
+    (dolist (row intervals)
+      (unless (nth 4 row)
+        (let ((left (max start (nth 0 row)))
+              (right (min end (nth 1 row))))
+          (when (< left right)
+            (push (list left right (/ (- right left) 60.0) (nth 3 row)) rows)))))
+    (nreverse rows)))
+
+(defun org-timeviz-dashboard--fmt-hhmm (seconds)
+  "Format SECONDS in local time."
+  (format-time-string "%H:%M" seconds))
+
+(defun org-timeviz-dashboard--fmt-dur (minutes)
+  "Format MINUTES as hours and whole minutes, without rounding up."
+  (let ((whole (floor minutes)))
+    (format "%d:%02d" (/ whole 60) (% whole 60))))
 
 (defun org-timeviz-dashboard--interval-label (row)
   "Format interval ROW for the overlap report."
@@ -174,7 +140,7 @@ clocks."
 
 (defun org-timeviz-dashboard--task-label (row)
   "Format interval ROW's file and heading."
-  (format "%s: %s" (nth 2 row) (nth 3 row)))
+  (format "%s: %s" (nth 2 row) (org-link-display-format (nth 3 row))))
 
 (defun org-timeviz-dashboard--location-label (row)
   "Format interval ROW's CLOCK line as FILE:LINE."
@@ -203,7 +169,7 @@ by `org-timeviz-dashboard--all-intervals'."
                                 (org-timeviz-dashboard--key<
                                  (list (nth 2 left) (nth 5 left))
                                  (list (nth 2 right) (nth 5 right)))))))
-              (push (list (nth 3 row)
+              (push (list (org-link-display-format (nth 3 row))
                           (org-timeviz-dashboard--interval-label row)
                           (org-timeviz-dashboard--location-label (nth 0 pair))
                           (org-timeviz-dashboard--location-label (nth 1 pair)))
@@ -273,14 +239,14 @@ the interval with the shorter task label."
         (let ((gap-start (nth 1 previous-row))
               (gap-end (nth 0 row)))
           (push (list "GAP"
-                      (my/org-clocklog--fmt-hhmm gap-start)
-                      (my/org-clocklog--fmt-hhmm gap-end)
-                      (my/org-clocklog--fmt-dur (/ (- gap-end gap-start) 60.0)))
+                      (org-timeviz-dashboard--fmt-hhmm gap-start)
+                      (org-timeviz-dashboard--fmt-hhmm gap-end)
+                      (org-timeviz-dashboard--fmt-dur (/ (- gap-end gap-start) 60.0)))
                 display-rows)))
-      (push (list (org-timeviz-dashboard--link-description (nth 3 row))
-                  (my/org-clocklog--fmt-hhmm (nth 0 row))
-                  (my/org-clocklog--fmt-hhmm (nth 1 row))
-                  (my/org-clocklog--fmt-dur (nth 2 row)))
+      (push (list (org-link-display-format (nth 3 row))
+                  (org-timeviz-dashboard--fmt-hhmm (nth 0 row))
+                  (org-timeviz-dashboard--fmt-hhmm (nth 1 row))
+                  (org-timeviz-dashboard--fmt-dur (nth 2 row)))
             display-rows)
       (setq previous-row row))
     (setq display-rows (nreverse display-rows))
@@ -298,7 +264,7 @@ the interval with the shorter task label."
 
 (defun org-timeviz-dashboard--day-total (rows)
   "Return total logged duration from clocklog ROWS."
-  (my/org-clocklog--fmt-dur
+  (org-timeviz-dashboard--fmt-dur
    (org-timeviz-dashboard--rows-minutes rows)))
 
 (defun org-timeviz-dashboard--date-plus-days (date-str days)
@@ -314,17 +280,17 @@ the interval with the shorter task label."
             (nth 0 gregorian)
             (nth 1 gregorian))))
 
-(defun org-timeviz-dashboard--week-total (week-start-str files)
-  "Return total logged duration in FILES for the seven days from WEEK-START-STR."
+(defun org-timeviz-dashboard--week-total (week-start-str intervals)
+  "Total INTERVALS over seven days starting at WEEK-START-STR."
   (let ((total 0.0))
     (dotimes (offset 7)
       (setq total
             (+ total
                (org-timeviz-dashboard--rows-minutes
-                (my/org-clocklog-rows
+                (org-timeviz-dashboard--day-rows
                  (org-timeviz-dashboard--date-plus-days week-start-str offset)
-                 files)))))
-    (my/org-clocklog--fmt-dur total)))
+                 intervals)))))
+    (org-timeviz-dashboard--fmt-dur total)))
 
 (defun org-timeviz-dashboard--date-argument-p (value)
   "Return non-nil when command-line argument VALUE is a YYYY-MM-DD date."
@@ -334,28 +300,24 @@ the interval with the shorter task label."
   "Emit one marked JSON dashboard payload.
 The command-line arguments are the report dates followed by the Org files to
 scan.  The user's `org-agenda-files' is neither used nor changed."
-  (mapc #'org-timeviz-dashboard--require-helper
-        '(my/org-clock-suspects
-          my/org--collect-ts-pos
-          my/org--ts->sec
-          my/org-clocklog-rows
-          my/org-clocklog--fmt-hhmm
-          my/org-clocklog--fmt-dur))
   (let* ((args (remove "--" command-line-args-left))
          (dates (cl-remove-if-not #'org-timeviz-dashboard--date-argument-p args))
          (files (cl-remove-if #'org-timeviz-dashboard--date-argument-p args))
          (day (or (nth 0 dates) (format-time-string "%Y-%m-%d")))
          (day-total-day (or (nth 1 dates) day))
          (week-start (or (nth 2 dates) day))
-         (day-rows (my/org-clocklog-rows day files))
-         (day-total-rows (my/org-clocklog-rows day-total-day files))
-         (intervals (org-timeviz-dashboard--all-intervals files))
+         (parsed (mapcar #'org-timeviz-clock-read files))
+         (clocks (apply #'append (mapcar #'car parsed)))
+         (issues (apply #'append (mapcar #'cadr parsed)))
+         (intervals (org-timeviz-dashboard--all-intervals clocks))
+         (day-rows (org-timeviz-dashboard--day-rows day intervals))
+         (day-total-rows (org-timeviz-dashboard--day-rows day-total-day intervals))
          (payload
-          `((suspects . ,(org-timeviz-dashboard--suspect-text files intervals))
+          `((suspects . ,(org-timeviz-dashboard--suspect-text issues intervals))
             (overlaps . ,(org-timeviz-dashboard--overlap-records intervals))
             (chronological . ,(org-timeviz-dashboard--clocklog-text day day-rows))
             (day_total . ,(org-timeviz-dashboard--day-total day-total-rows))
-            (week_total . ,(org-timeviz-dashboard--week-total week-start files)))))
+            (week_total . ,(org-timeviz-dashboard--week-total week-start intervals)))))
     ;; Consumed here, so Emacs does not visit the files again after this script,
     ;; which could prompt if one was saved meanwhile.
     (setq command-line-args-left nil)

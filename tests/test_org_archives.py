@@ -357,14 +357,6 @@ LEAVE_ORG = """\
 CLOCK: [2026-03-02 Mon 08:00]--[2026-03-02 Mon 17:00] =>  9:00
 :END:
 """
-# Reports every file it is given, to show which files the clock checks scan.
-SCANNED_FILES_SUSPECTS = """
-(defun my/org-clock-suspects (files)
-  (mapcar (lambda (file) (list (file-name-nondirectory file) "-" "scanned" "-" "-"))
-          files))
-"""
-
-
 @pytest.fixture
 def dashboard_workspace(tmp_path: Path) -> tuple[AppConfig, Path]:
     """Return a config whose `org-agenda-files` lists only the active files."""
@@ -374,8 +366,6 @@ def dashboard_workspace(tmp_path: Path) -> tuple[AppConfig, Path]:
     leave.write_text(LEAVE_ORG, encoding="utf-8")
     init_path = tmp_path / "init-org.el"
     write_dashboard_init(init_path, [work, leave])
-    with init_path.open("a", encoding="utf-8") as handle:
-        handle.write(SCANNED_FILES_SUSPECTS)
     sources = {"mode": "emacs", "emacs_init_paths": [str(init_path)]}
     return _app_config(tmp_path / "outputs", sources), work
 
@@ -419,8 +409,7 @@ def test_dashboard_reads_active_and_archived_clocks(
         "work.org_archive: Nested review",
         "work.org: Ongoing work",
     ]
-    assert "work.org_archive" not in before.suspects
-    assert "| work.org_archive | -       | scanned |" in after.suspects
+    assert before.suspects == after.suspects == "All CLOCK lines look standard."
     assert {path: path.read_bytes() for path in org_bytes} == org_bytes
 
 
