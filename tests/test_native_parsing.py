@@ -116,6 +116,25 @@ def test_malformed_open_and_durationless_clocks(tmp_path: Path) -> None:
     assert org.read_bytes() == before
 
 
+def test_chronological_ties_keep_input_file_order_and_reverse_line_order(tmp_path: Path) -> None:
+    first = tmp_path / "z-first.org"
+    second = tmp_path / "a-second.org"
+    clock = "CLOCK: [2026-08-05 Wed 09:00]--[2026-08-05 Wed 10:00] => 1:00\n"
+    first.write_text(f"* Earlier line\n{clock}* Later line\n{clock}", encoding="utf-8")
+    second.write_text(f"* Second file\n{clock}", encoding="utf-8")
+    report = render_clock_dashboard(
+        _app_config(tmp_path / "output", org_files=[first, second]),
+        day=date(2026, 8, 5),
+        day_total_day=date(2026, 8, 5),
+        week_start=date(2026, 8, 3),
+    )
+    assert [line.split("|")[1].strip() for line in report.chronological.splitlines()[2:]] == [
+        "Later line",
+        "Earlier line",
+        "Second file",
+    ]
+
+
 def test_duration_mismatch_retains_one_minute_tolerance(tmp_path: Path) -> None:
     org = tmp_path / "tolerance.org"
     org.write_text(
@@ -125,11 +144,49 @@ def test_duration_mismatch_retains_one_minute_tolerance(tmp_path: Path) -> None:
     assert _dashboard(tmp_path, org).suspects == "All CLOCK lines look standard."
 
 
+def test_native_edge_cases_do_not_crash_dashboard(tmp_path: Path) -> None:
+    org = tmp_path / "edge.org"
+    org.write_text(
+        "* Date-only clock\nCLOCK: [2000-01-01 Sat]\n"
+        "* Invalid duration\n"
+        "CLOCK: [2026-08-05 Wed 09:00]--[2026-08-05 Wed 10:00] => nonsense\n"
+        "* Valid\nCLOCK: [2026-08-05 Wed 09:00]--[2026-08-05 Wed 10:00] => 1:00\n",
+        encoding="utf-8",
+    )
+    report = _dashboard(tmp_path, org)
+    assert "Malformed CLOCK" in report.suspects
+    assert "single timestamp (open clock)" in report.suspects
+    assert len(report.overlaps) == 1
+    assert "2000-01-01T00:00" in {report.overlaps[0].a.start, report.overlaps[0].b.start}
+
+
+@pytest.mark.parametrize("zone", ["UTC", "America/New_York"])
+def test_overlap_identity_uses_original_timestamp_components(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, zone: str
+) -> None:
+    monkeypatch.setenv("TZ", zone)
+    org = tmp_path / "dst.org"
+    org.write_text(
+        "* Task\n:PROPERTIES:\n:ID: stable-id\n:END:\n"
+        "CLOCK: [2026-11-01 Sun 01:15]--[2026-11-01 Sun 02:30] => 1:15\n"
+        "CLOCK: [2026-11-01 Sun 01:30]--[2026-11-01 Sun 02:45] => 1:15\n",
+        encoding="utf-8",
+    )
+    report = _dashboard(tmp_path, org)
+    overlap = report.overlaps[0]
+    assert {clock.org_id for clock in (overlap.a, overlap.b)} == {"stable-id"}
+    assert {(clock.start, clock.end) for clock in (overlap.a, overlap.b)} == {
+        ("2026-11-01T01:15", "2026-11-01T02:30"),
+        ("2026-11-01T01:30", "2026-11-01T02:45"),
+    }
+
+
 def test_computed_config_and_work_personal_selection(tmp_path: Path) -> None:
     init = tmp_path / "init.el"
     work = tmp_path / "work.org"
     personal = tmp_path / "personal.org"
     init.write_text(
+        '(princ "configuration message without newline")\n'
         f"(let ((root {json.dumps(str(tmp_path))}))\n"
         "  (setq work-files (mapcar (lambda (name) (expand-file-name name root))\n"
         '                           \'("work.org")))\n'

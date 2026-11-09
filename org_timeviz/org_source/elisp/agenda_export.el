@@ -21,7 +21,7 @@ configuration hooks and file-local code never run while reading source files."
                        (let ((org-mode-hook nil) (org-inhibit-startup t))
                          (org-mode))
                        org-todo-keywords-1)))
-      (princ "ORG_TIMEVIZ_AGENDA_JSON:")
+      (princ "\nORG_TIMEVIZ_AGENDA_JSON:")
       (princ (json-encode `((files . ,(vconcat files))
                             (todo_keywords . ,(vconcat keywords)))))
       (princ "\n"))))

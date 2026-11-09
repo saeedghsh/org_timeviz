@@ -29,61 +29,68 @@ it deliberately does not attempt to recover timestamps from malformed input."
     (let ((tree (org-element-parse-buffer))
           (recognized (make-hash-table :test #'eql))
           clocks issues)
-      (org-element-map tree 'clock
-        (lambda (clock)
-          (let* ((pos (org-element-property :begin clock))
-                 (line (line-number-at-pos pos))
-                 (stamp (org-element-property :value clock))
-                 ;; Org calls a range without a declared duration "running".
-                 ;; The timestamp range, not that status, determines its end.
-                 (open (not (memq (org-element-property :type stamp)
-                                  '(inactive-range active-range))))
-                 (start (org-timestamp-to-time stamp))
-                 (end (unless open (org-timestamp-to-time stamp t)))
-                 (duration (org-element-property :duration clock))
-                 ;; Org can recognize only the first timestamp of a broken
-                 ;; line.  Do not turn leftover text into a live interval.
-                 (malformed
-                  (and open
-                       (save-excursion
-                         (goto-char pos)
-                         (not (string-blank-p
-                               (buffer-substring-no-properties
-                                (min (org-element-property :end stamp)
-                                     (line-end-position))
-                                (line-end-position))))))))
-            (unless malformed
-              (puthash line t recognized)
-            (goto-char pos)
-            (let ((raw (buffer-substring-no-properties
-                        (line-beginning-position) (line-end-position))))
-              (when (org-before-first-heading-p)
-                (push (list (file-name-nondirectory file) "(no heading)"
-                            "No owning heading" raw (format "Line %d" line)) issues))
-              (unless (org-before-first-heading-p)
-                (org-back-to-heading t)
-                (let ((heading (org-get-heading t t t t)))
-                  (push (append
-                         (list :start start :end end :open open :position pos
-                               :line line :heading heading :id (org-id-get)
-                               :file file :timestamp stamp :duration duration)
-                         (when metadata (funcall metadata)))
-                        clocks)
-                  (let ((issue
-                         (cond
-                          (open "single timestamp (open clock)")
-                          ((not (time-less-p start end)) "Non-positive duration")
-                          ((and duration
-                                (> (abs (- (org-duration-to-minutes duration)
-                                           (max 0 (round
-                                                   (/ (float-time
-                                                       (time-subtract end start))
-                                                      60.0)))))
-                                   1))
-                           "duration mismatch"))))
-                    (when issue
-                      (push (list (file-name-nondirectory file) heading issue raw
-                                  (format "Line %d" line)) issues))))))))))
+      (org-element-map
+       tree 'clock
+       (lambda (clock)
+         (let* ((pos (org-element-property :begin clock))
+                (line (line-number-at-pos pos))
+                (stamp (org-element-property :value clock))
+                ;; Org calls a range without a declared duration "running".
+                ;; The timestamp range, not that status, determines its end.
+                (open (not (memq (org-element-property :type stamp)
+                                 '(inactive-range active-range))))
+                (start (org-timestamp-to-time stamp))
+                (end (unless open (org-timestamp-to-time stamp t)))
+                (duration (org-element-property :duration clock))
+                (declared-minutes
+                 (and duration
+                      (condition-case nil (org-duration-to-minutes duration t)
+                        (error nil))))
+                ;; Org can recognize only the first timestamp of a broken
+                ;; line.  Do not turn leftover text into a live interval.
+                (malformed
+                 (and open
+                      (save-excursion
+                        (goto-char pos)
+                        (not (string-blank-p
+                              (buffer-substring-no-properties
+                               (min (org-element-property :end stamp)
+                                    (line-end-position))
+                               (line-end-position))))))))
+           (unless malformed
+             (puthash line t recognized)
+             (goto-char pos)
+             (let ((raw (buffer-substring-no-properties
+                         (line-beginning-position) (line-end-position))))
+               (when (org-before-first-heading-p)
+                 (push (list (file-name-nondirectory file) "(no heading)"
+                             "No owning heading" raw (format "Line %d" line)) issues))
+               (unless (org-before-first-heading-p)
+                 (org-back-to-heading t)
+                 (let ((heading (org-get-heading t t t t)))
+                   (push (append
+                          (list :start start :end end :open open :position pos
+                                :line line :heading heading :id (org-id-get)
+                                :file file :timestamp stamp :duration duration)
+                          (when metadata (funcall metadata)))
+                         clocks)
+                   (let ((issue
+                          (cond
+                           (open "single timestamp (open clock)")
+                           ((not (time-less-p start end)) "Non-positive duration")
+                           ((and duration (null declared-minutes))
+                            "Malformed declared duration")
+                           ((and declared-minutes
+                                 (> (abs (- declared-minutes
+                                            (max 0 (round
+                                                    (/ (float-time
+                                                        (time-subtract end start))
+                                                       60.0)))))
+                                    1))
+                            "duration mismatch"))))
+                     (when issue
+                       (push (list (file-name-nondirectory file) heading issue raw
+                                   (format "Line %d" line)) issues))))))))))
       (goto-char (point-min))
       (while (re-search-forward "^[ \t]*CLOCK:" nil t)
         (let ((line (line-number-at-pos (match-beginning 0))))
@@ -104,8 +111,9 @@ This is the persistent overlap identity; no timezone conversion is involved."
   (let ((suffix (if end "end" "start")))
     (apply #'format "%04d-%02d-%02dT%02d:%02d"
            (mapcar (lambda (part)
-                     (org-element-property
-                      (intern (concat ":" part "-" suffix)) timestamp))
+                     (or (org-element-property
+                          (intern (concat ":" part "-" suffix)) timestamp)
+                         0))
                    '("year" "month" "day" "hour" "minute")))))
 
 (provide 'org_timeviz_clock)
