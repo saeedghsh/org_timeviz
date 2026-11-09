@@ -1,4 +1,4 @@
-"""Render live Org clock dashboard text through the user's Emacs configuration."""
+"""Render live Org clock dashboard text using Org's native parser."""
 
 import json
 import logging
@@ -12,14 +12,6 @@ from .inputs import resolve_org_inputs
 
 _LOG = logging.getLogger(__name__)
 DASHBOARD_JSON_PREFIX = "ORG_TIMEVIZ_CLOCK_DASHBOARD_JSON:"
-_REQUIRED_INIT_MARKERS = (
-    "(defun my/org-clock-suspects",
-    "(defun my/org--collect-ts-pos",
-    "(defun my/org--ts->sec",
-    "(defun my/org-clocklog-rows",
-    "(defun my/org-clocklog--fmt-hhmm",
-    "(defun my/org-clocklog--fmt-dur",
-)
 
 
 @dataclass(frozen=True)
@@ -71,7 +63,6 @@ def render_clock_dashboard(
     week_start: date,
 ) -> ClockDashboard:
     """Run the live clock dashboard exporter and return its text reports."""
-    init_path = _find_clock_dashboard_init(cfg)
     script_path = Path(__file__).resolve().parent / "elisp" / "clock_dashboard_export.el"
     if not script_path.exists():
         raise FileNotFoundError(f"Missing clock dashboard exporter: {script_path}")
@@ -86,8 +77,6 @@ def render_clock_dashboard(
         "emacs",
         "--batch",
         "-Q",
-        "--load",
-        str(init_path),
         "--load",
         str(script_path),
         "--",
@@ -129,30 +118,6 @@ def render_clock_dashboard(
         day_total=str(payload["day_total"]),
         week_total=str(payload["week_total"]),
         overlaps=_parse_overlaps(payload["overlaps"]),
-    )
-
-
-def _find_clock_dashboard_init(cfg: AppConfig) -> Path:
-    """Find the configured init file that directly defines the dashboard helpers."""
-    checked: list[str] = []
-    for path_text in cfg.org_sources.emacs_init_paths:
-        path = Path(path_text).expanduser()
-        if not path.exists() or not path.is_file():
-            continue
-
-        checked.append(str(path))
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError:
-            continue
-
-        if all(marker in text for marker in _REQUIRED_INIT_MARKERS):
-            return path.resolve()
-
-    checked_text = ", ".join(checked) if checked else "(no existing configured init files)"
-    raise FileNotFoundError(
-        "Could not find an Emacs init file defining the org-timeviz clock dashboard helpers "
-        f"among: {checked_text}"
     )
 
 

@@ -4,6 +4,8 @@
 (require 'org)
 (require 'json)
 
+(declare-function org-timeviz-clock-read "org_timeviz_clock" (file &optional metadata))
+
 (setq org-use-tag-inheritance t)
 
 (setq org-use-tag-inheritance t)
@@ -91,26 +93,6 @@ Comments are ignored because we read Lisp forms, not text."
 
 (org-timeviz--maybe-configure-todo-keywords)
 
-(defun org-timeviz--ts-to-time (ts)
-  "Convert Org timestamp string TS to Emacs time."
-  (let* ((p (org-parse-time-string ts))
-         (sec (or (nth 0 p) 0))
-         (min (or (nth 1 p) 0))
-         (hour (or (nth 2 p) 0))
-         (day (or (nth 3 p) 1))
-         (mon (or (nth 4 p) 1))
-         (year (or (nth 5 p) 1970)))
-    (encode-time sec min hour day mon year)))
-
-(defun org-timeviz--ts-to-iso (ts)
-  "Convert Org timestamp string TS to ISO-8601 (local time)."
-  (format-time-string "%Y-%m-%dT%H:%M:%S" (org-timeviz--ts-to-time ts)))
-
-(defun org-timeviz--extract-clock (s)
-  "Extract (START END) timestamp strings from CLOCK line S, or nil."
-  (when (string-match "CLOCK:[[:space:]]*\\[\\([^]]+\\)\\][[:space:]]*--[[:space:]]*\\[\\([^]]+\\)\\]" s)
-    (list (match-string 1 s) (match-string 2 s))))
-
 ;; `org-archive-subtree' records these on the root of each subtree it moves.
 ;; ARCHIVE_TIME is not among them because archiving to an in-file archive
 ;; sibling sets it too, and such a subtree keeps its real path and tags.
@@ -165,35 +147,28 @@ so each tag is returned only once."
   (princ (json-encode obj))
   (princ "\n"))
 
+(load (expand-file-name "org_timeviz_clock.el"
+                             (file-name-directory (or load-file-name buffer-file-name)))
+      nil t)
+
 (defun org-timeviz--export-file (file)
-  "Export all CLOCK records from FILE as JSONL to stdout."
-  (with-temp-buffer
-    (insert-file-contents file)
-    (org-mode)
-    (goto-char (point-min))
-    (while (re-search-forward "^[[:space:]]*CLOCK:" nil t)
-      (let* ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position)))
-             (pair (org-timeviz--extract-clock line)))
-        (when pair
-          (let ((start-ts (nth 0 pair))
-                (end-ts (nth 1 pair)))
-            (save-excursion
-              (condition-case nil
-                  (progn
-                    (org-back-to-heading t)
-                    (let* ((path (org-timeviz--outline-path))
-                           (headline (car (last path)))
-                           (tags (org-timeviz--effective-tags))
-                           (category (org-timeviz--category)))
-                      (org-timeviz--emit-jsonl
-                       `((file . ,(expand-file-name file))
-                         (start . ,(org-timeviz--ts-to-iso start-ts))
-                         (end . ,(org-timeviz--ts-to-iso end-ts))
-                         (outline_path . ,path)
-                         (headline . ,headline)
-                         (tags . ,tags)
-                         (category . ,category)))))
-                (error nil)))))))))
+  "Export closed CLOCK records from FILE as JSONL to stdout."
+  (dolist (clock (car (org-timeviz-clock-read
+                      file (lambda ()
+                             (list :path (org-timeviz--outline-path)
+                                   :tags (org-timeviz--effective-tags)
+                                   :category (org-timeviz--category))))))
+    ;; Reports have always excluded running clocks.  Dashboard overlaps include
+    ;; them, but use the same native extraction.
+    (unless (plist-get clock :open)
+      (org-timeviz--emit-jsonl
+       `((file . ,(expand-file-name file))
+         (start . ,(format-time-string "%Y-%m-%dT%H:%M:%S" (plist-get clock :start)))
+         (end . ,(format-time-string "%Y-%m-%dT%H:%M:%S" (plist-get clock :end)))
+         (outline_path . ,(plist-get clock :path))
+         (headline . ,(plist-get clock :heading))
+         (tags . ,(plist-get clock :tags))
+         (category . ,(plist-get clock :category)))))))
 
 (defun org-timeviz-export-main ()
   "Main entry point for batch export. Reads files from command-line-args-left."

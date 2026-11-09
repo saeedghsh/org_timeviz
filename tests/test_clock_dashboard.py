@@ -120,7 +120,8 @@ def test_render_clock_dashboard_uses_configured_init_and_marked_json(tmp_path: P
 
     command = run.call_args.args[0]
     assert command[:3] == ["emacs", "--batch", "-Q"]
-    assert command[4] == str(init_path.resolve())
+    assert str(init_path.resolve()) not in command
+    assert command[4].endswith("clock_dashboard_export.el")
     assert command[-3:] == ["2026-08-05", "2026-08-06", "2026-08-03"]
     assert report == ClockDashboard(
         day="2026-08-05",
@@ -189,27 +190,14 @@ def test_render_clock_dashboard_rejects_malformed_overlaps(
 
 @pytest.mark.skipif(shutil.which("emacs") is None, reason="Emacs is not installed")
 def test_render_clock_dashboard_includes_gaps_between_entries(tmp_path: Path) -> None:
-    init_path = tmp_path / "init-org.el"
-    init_path.write_text(
-        """
-(setq org-agenda-files nil)
-(defun my/org-clock-suspects (files) (ignore files) nil)
-(defun my/org--collect-ts-pos (text) (ignore text) nil)
-(defun my/org--ts->sec (timestamp) (ignore timestamp) 0)
-(defun my/org-clocklog-rows (&optional date files)
-  (ignore date files)
-  '((32400 36000 60 "First task")
-    (37800 39600 30 "Second task")
-    (39600 41400 30 "Third task")))
-(defun my/org-clocklog--fmt-hhmm (seconds)
-  (format "%02d:%02d" (/ seconds 3600) (/ (% seconds 3600) 60)))
-(defun my/org-clocklog--fmt-dur (minutes)
-  (let ((rounded (round minutes)))
-    (format "%d:%02d" (/ rounded 60) (% rounded 60))))
-""".strip(),
+    org = tmp_path / "gaps.org"
+    org.write_text(
+        _org_task("First task", "09:00", "10:00")
+        + _org_task("Second task", "10:30", "11:00")
+        + _org_task("Third task", "11:00", "11:30"),
         encoding="utf-8",
     )
-    cfg = _app_config(tmp_path / "outputs", [init_path])
+    cfg = _app_config(tmp_path / "outputs", org_files=[org])
 
     report = render_clock_dashboard(
         cfg,
@@ -403,18 +391,17 @@ def test_overlap_records_mark_open_clocks(tmp_path: Path) -> None:
     )
 
 
-def test_render_clock_dashboard_requires_custom_helpers(tmp_path: Path) -> None:
+@requires_emacs
+def test_render_clock_dashboard_needs_no_custom_helpers(tmp_path: Path) -> None:
     init_path = tmp_path / "init-org.el"
-    init_path.write_text("(require 'org)\n", encoding="utf-8")
-    cfg = _app_config(tmp_path / "outputs", [init_path])
-
-    with pytest.raises(FileNotFoundError, match="clock dashboard helpers"):
-        render_clock_dashboard(
-            cfg,
-            day=date(2026, 8, 5),
-            day_total_day=date(2026, 8, 6),
-            week_start=date(2026, 8, 3),
-        )
+    init_path.write_text('(error "Dashboard must not load configuration")', encoding="utf-8")
+    report = render_clock_dashboard(
+        _app_config(tmp_path / "outputs", [init_path]),
+        day=date(2026, 8, 5),
+        day_total_day=date(2026, 8, 6),
+        week_start=date(2026, 8, 3),
+    )
+    assert report.day_total == "0:00"
 
 
 def test_render_clock_dashboard_reports_emacs_failure(tmp_path: Path) -> None:
