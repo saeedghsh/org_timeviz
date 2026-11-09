@@ -57,18 +57,26 @@ can be changed independently. Live clocks are included through the current time
 in all three reports. All dashboard reports read the same files as the plots,
 including archive files, rather than `org-agenda-files`.
 
-These reports deliberately reuse the clock helpers from the configured Emacs
-setup rather than reimplementing their semantics in Python. The configured
-`org_sources.emacs_init_paths` must therefore include the file that directly
-defines `my/org-clock-suspects`, `my/org-clocklog-rows`, and the associated
-formatting helpers; with the default configuration this can be
-`~/.emacs.d/lisp/init-org.el`. The suspect report uses `my/org-clock-suspects`
-for the existing clock-line checks and supplements it with an overlap scan.
+These reports use Org's native clock and timestamp APIs; no personal Emacs
+helper functions are required. Each file is parsed once per dashboard request,
+then the resulting intervals are reused for the daily and weekly reports,
+overlaps, and duplicate checks. Headings come directly from `org-get-heading`;
+Org links within headings are displayed using `org-link-display-format`.
+Progress cookies and square brackets do not require generating heading links.
 
-Dashboard reads are non-mutating. Before opening Org files in the batch Emacs
-process, org-timeviz disables `my/org-auto-resolve-dangling-clocks` when that
-variable exists, so viewing the dashboard does not automatically resolve or
-rewrite dangling clocks.
+Dashboard reads are non-mutating: Org files are inserted into temporary buffers,
+not visited, and Org startup hooks and file-local evaluation are not run.
+A lightweight raw-line scan reports malformed CLOCK-looking lines that Org
+cannot parse; it does not attempt to recover their intervals. Diagnostics also
+report open clocks and declared-duration mismatches (with the existing
+one-minute tolerance). Malformed lines are no longer guessed into intervals.
+For compatibility, dashboard days still end at 23:59:59 and displayed totals
+floor fractional minutes; an interval crossing midnight can therefore lose a
+minute in the displayed weekly total. Static plots continue to use only closed
+clocks and retain their existing time calculations.
+
+See [Parsing and configuration safety](docs/parsing.md) for the API audit,
+configuration evaluation limitations, and regression coverage.
 
 Changing any clock-dashboard date automatically refreshes the text reports. Use
 **Refresh clock reports** to reload them without changing a date, for example
@@ -268,8 +276,22 @@ shared filters and plot settings; it does not list report names.
   * `tag_to_bucket`: mapping from raw Org tags to canonical time buckets
   * `resolution`: arbitration logic for tasks matching multiple time buckets
 
-TODO status keywords are obtained robustly via the Emacs batch step, so task
-titles in plots exclude states like TODO/IN-PROGRESS/BLOCKED/etc.
+Agenda paths and TODO status keywords are obtained by evaluating the first
+applicable configured init in a separate `emacs --batch -Q` process, using
+`org-agenda-files` and Org's effective TODO keywords. Computed Lisp values and
+custom `emacs_agenda_var` selections (for example work or personal lists) are
+supported. Titles exclude configured states like TODO/IN-PROGRESS/BLOCKED/etc.
+
+**Only configure trusted Lisp files.** Evaluation can execute arbitrary code;
+the batch process is not a sandbox. The default candidate order prefers
+`~/.emacs.d/lisp/init-org.el` to avoid loading unrelated UI/package configuration.
+A standalone `~/.emacs` or an init which requires `init-org` is also supported.
+Missing candidates are skipped; evaluation failures and timeouts are errors,
+not silently ignored. Configurations requiring interactive startup or unavailable
+packages may not work in batch mode. No changes to your Emacs config are needed.
+In explicit-file mode agenda lists are ignored, but configured init files may
+still be evaluated for TODO keywords. Set `emacs_init_paths: []` to avoid all
+configuration evaluation in that mode.
 
 ## Outputs
 

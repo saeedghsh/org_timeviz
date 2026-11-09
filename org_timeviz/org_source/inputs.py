@@ -73,10 +73,8 @@ def configure_emacs_init(
             result = read_agenda_files_from_emacs_init(init_path, cfg.org_sources.emacs_agenda_var)
             if result is not None:
                 os.environ["ORG_TIMEVIZ_TODO_KEYWORDS"] = json.dumps(result.todo_keywords)
-                os.environ.pop("ORG_TIMEVIZ_EMACS_INIT", None)
                 return
 
-    os.environ.pop("ORG_TIMEVIZ_EMACS_INIT", None)
     os.environ.pop("ORG_TIMEVIZ_TODO_KEYWORDS", None)
 
 

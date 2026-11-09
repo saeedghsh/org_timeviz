@@ -7,7 +7,7 @@
 (require 'org-id)
 
 (load (expand-file-name "org_timeviz_clock.el"
-                             (file-name-directory (or load-file-name buffer-file-name)))
+                        (file-name-directory (or load-file-name buffer-file-name)))
       nil t)
 
 (declare-function org-timeviz-clock-read "org_timeviz_clock" (file &optional metadata))
@@ -91,8 +91,12 @@ Overlapping intervals are reported separately as structured records."
   "Convert native CLOCKS to sorted dashboard rows.
 Rows retain (START END FILE HEADING OPEN LINE ORG-ID START-STAMP END-STAMP).
 Identity uses local timestamp components, never file, label or line number."
-  (let ((now (float-time)) rows)
+  (let ((now (float-time))
+        (file-order (make-hash-table :test #'equal))
+        rows)
     (dolist (clock clocks)
+      (unless (gethash (plist-get clock :file) file-order)
+        (puthash (plist-get clock :file) (1+ (hash-table-count file-order)) file-order))
       (let* ((start (float-time (plist-get clock :start)))
              (open (plist-get clock :open))
              (end (if open now (float-time (plist-get clock :end)))))
@@ -104,7 +108,8 @@ Identity uses local timestamp components, never file, label or line number."
                       (org-timeviz-clock-identity (plist-get clock :timestamp))
                       (unless open
                         (org-timeviz-clock-identity
-                         (plist-get clock :timestamp) t))) rows))))
+                         (plist-get clock :timestamp) t))
+                      (gethash (plist-get clock :file) file-order)) rows))))
     (cl-stable-sort rows #'< :key #'car)))
 
 (defun org-timeviz-dashboard--day-rows (day intervals)
@@ -119,8 +124,15 @@ Preserve the historical dashboard boundary at 23:59:59, not midnight."
       (let ((left (max start (nth 0 row)))
             (right (min end (nth 1 row))))
         (when (< left right)
-          (push (list left right (/ (- right left) 60.0) (nth 3 row)) rows))))
-    (nreverse rows)))
+          (push (list left right (/ (- right left) 60.0) (nth 3 row)
+                      (nth 9 row) (nth 5 row)) rows))))
+    ;; The former clocklog collector pushed rows within each file, then sorted
+    ;; clipped starts stably: ties retain input file order, descending line.
+    (cl-stable-sort
+     rows (lambda (left right)
+            (org-timeviz-dashboard--key<
+             (list (nth 0 left) (nth 4 left) (- (nth 5 left)))
+             (list (nth 0 right) (nth 4 right) (- (nth 5 right))))))))
 
 (defun org-timeviz-dashboard--fmt-hhmm (seconds)
   "Format SECONDS in local time."

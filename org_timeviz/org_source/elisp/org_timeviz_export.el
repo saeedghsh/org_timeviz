@@ -63,16 +63,16 @@ so each tag is returned only once."
   (princ "\n"))
 
 (load (expand-file-name "org_timeviz_clock.el"
-                             (file-name-directory (or load-file-name buffer-file-name)))
+                        (file-name-directory (or load-file-name buffer-file-name)))
       nil t)
 
 (defun org-timeviz--export-file (file)
   "Export closed CLOCK records from FILE as JSONL to stdout."
   (dolist (clock (car (org-timeviz-clock-read
-                      file (lambda ()
-                             (list :path (org-timeviz--outline-path)
-                                   :tags (org-timeviz--effective-tags)
-                                   :category (org-timeviz--category))))))
+                       file (lambda ()
+                              (list :path (org-timeviz--outline-path)
+                                    :tags (org-timeviz--effective-tags)
+                                    :category (org-timeviz--category))))))
     ;; Reports have always excluded running clocks.  Dashboard overlaps include
     ;; them, but use the same native extraction.
     (unless (plist-get clock :open)
