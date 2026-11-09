@@ -32,10 +32,7 @@
 
 (defun org-timeviz-dashboard--link-description (value)
   "Return the visible description from Org link VALUE, when present."
-  (if (and (stringp value)
-           (string-match "\\[\\[[^]]+\\]\\[\\([^]]+\\)\\]\\]" value))
-      (match-string 1 value)
-    (format "%s" value)))
+  (org-link-display-format (format "%s" value)))
 
 (defun org-timeviz-dashboard--cell-string (value)
   "Convert VALUE to a single-line table cell string."
@@ -206,7 +203,7 @@ by `org-timeviz-dashboard--all-intervals'."
                                 (org-timeviz-dashboard--key<
                                  (list (nth 2 left) (nth 5 left))
                                  (list (nth 2 right) (nth 5 right)))))))
-              (push (list (org-timeviz-dashboard--link-description (nth 3 row))
+              (push (list (nth 3 row)
                           (org-timeviz-dashboard--interval-label row)
                           (org-timeviz-dashboard--location-label (nth 0 pair))
                           (org-timeviz-dashboard--location-label (nth 1 pair)))
