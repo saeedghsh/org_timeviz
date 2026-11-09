@@ -56,7 +56,9 @@ def test_read_agenda_files_returns_none_for_missing_or_absent(tmp_path: Path) ->
     assert read_agenda_files_from_emacs_init(tmp_path / "missing.el", "org-agenda-files") is None
     init = tmp_path / "init.el"
     init.write_text('(setq something-else \'("x"))', encoding="utf-8")
-    assert read_agenda_files_from_emacs_init(init, "org-agenda-files") is None
+    result = read_agenda_files_from_emacs_init(init, "org-agenda-files")
+    assert result is not None
+    assert result.files == []
 
 
 def test_resolve_explicit_inputs(tmp_path: Path) -> None:
@@ -94,8 +96,8 @@ def test_configure_emacs_init_sets_and_clears_environment(
     cfg = _app_config(emacs_init_paths=[str(init)])
     monkeypatch.setenv("ORG_TIMEVIZ_TODO_KEYWORDS", "OLD")
     configure_emacs_init(cfg, None)
-    assert Path(__import__("os").environ["ORG_TIMEVIZ_EMACS_INIT"]) == init
-    assert "ORG_TIMEVIZ_TODO_KEYWORDS" not in __import__("os").environ
+    assert "ORG_TIMEVIZ_EMACS_INIT" not in __import__("os").environ
+    assert json.loads(__import__("os").environ["ORG_TIMEVIZ_TODO_KEYWORDS"]) == ["TODO", "DONE"]
 
     empty_cfg = _app_config(emacs_init_paths=[])
     configure_emacs_init(empty_cfg, None)

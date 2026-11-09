@@ -78,9 +78,13 @@ def test_generate_other_catalogue_writes_header_for_no_records(
     cfg = _cfg(tmp_path)
     monkeypatch.setattr(
         "org_timeviz.other_catalogue.resolve_org_inputs",
-        lambda cfg: type("I", (), {"org_files": [], "agenda_init_path": None})(),
+        lambda cfg: type(
+            "I", (), {"org_files": [], "agenda_init_path": None, "todo_keywords": None}
+        )(),
     )
-    monkeypatch.setattr("org_timeviz.other_catalogue.configure_emacs_init", lambda *args: None)
+    monkeypatch.setattr(
+        "org_timeviz.other_catalogue.configure_emacs_init", lambda *args, **kwargs: None
+    )
     monkeypatch.setattr(
         "org_timeviz.other_catalogue.parse_org_clock_records_emacs", lambda **kwargs: []
     )
@@ -103,9 +107,13 @@ def test_generate_other_catalogue_applies_report_filters_over_all_records(
     ]
     monkeypatch.setattr(
         "org_timeviz.other_catalogue.resolve_org_inputs",
-        lambda cfg: type("I", (), {"org_files": [], "agenda_init_path": None})(),
+        lambda cfg: type(
+            "I", (), {"org_files": [], "agenda_init_path": None, "todo_keywords": None}
+        )(),
     )
-    monkeypatch.setattr("org_timeviz.other_catalogue.configure_emacs_init", lambda *args: None)
+    monkeypatch.setattr(
+        "org_timeviz.other_catalogue.configure_emacs_init", lambda *args, **kwargs: None
+    )
     monkeypatch.setattr(
         "org_timeviz.other_catalogue.parse_org_clock_records_emacs", lambda **kwargs: records
     )

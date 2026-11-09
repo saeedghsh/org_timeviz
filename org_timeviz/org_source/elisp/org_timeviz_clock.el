@@ -5,6 +5,15 @@
 (require 'org-duration)
 (require 'org-id)
 (require 'cl-lib)
+(require 'json)
+
+;; Only evaluated configuration data enters the source-file reader process.
+(let ((override (getenv "ORG_TIMEVIZ_TODO_KEYWORDS")))
+  (when (and override (> (length override) 0))
+    (let* ((json-array-type 'list)
+           (keywords (json-read-from-string override)))
+      (when keywords
+        (setq org-todo-keywords (list (cons 'sequence keywords)))))))
 
 (defun org-timeviz-clock-read (file &optional metadata)
   "Return (CLOCKS ISSUES) from FILE without visiting it or running user hooks.
@@ -25,11 +34,26 @@ it deliberately does not attempt to recover timestamps from malformed input."
           (let* ((pos (org-element-property :begin clock))
                  (line (line-number-at-pos pos))
                  (stamp (org-element-property :value clock))
-                 (open (eq (org-element-property :status clock) 'running))
+                 ;; Org calls a range without a declared duration "running".
+                 ;; The timestamp range, not that status, determines its end.
+                 (open (not (memq (org-element-property :type stamp)
+                                  '(inactive-range active-range))))
                  (start (org-timestamp-to-time stamp))
                  (end (unless open (org-timestamp-to-time stamp t)))
-                 (duration (org-element-property :duration clock)))
-            (puthash line t recognized)
+                 (duration (org-element-property :duration clock))
+                 ;; Org can recognize only the first timestamp of a broken
+                 ;; line.  Do not turn leftover text into a live interval.
+                 (malformed
+                  (and open
+                       (save-excursion
+                         (goto-char pos)
+                         (not (string-blank-p
+                               (buffer-substring-no-properties
+                                (min (org-element-property :end stamp)
+                                     (line-end-position))
+                                (line-end-position))))))))
+            (unless malformed
+              (puthash line t recognized)
             (goto-char pos)
             (let ((raw (buffer-substring-no-properties
                         (line-beginning-position) (line-end-position))))
@@ -47,15 +71,19 @@ it deliberately does not attempt to recover timestamps from malformed input."
                         clocks)
                   (let ((issue
                          (cond
-                          (open "Open clock")
+                          (open "single timestamp (open clock)")
                           ((not (time-less-p start end)) "Non-positive duration")
                           ((and duration
-                                (/= (org-duration-to-minutes duration)
-                                    (/ (float-time (time-subtract end start)) 60.0)))
-                           "Declared-duration mismatch"))))
+                                (> (abs (- (org-duration-to-minutes duration)
+                                           (max 0 (round
+                                                   (/ (float-time
+                                                       (time-subtract end start))
+                                                      60.0)))))
+                                   1))
+                           "duration mismatch"))))
                     (when issue
                       (push (list (file-name-nondirectory file) heading issue raw
-                                  (format "Line %d" line)) issues)))))))))
+                                  (format "Line %d" line)) issues))))))))))
       (goto-char (point-min))
       (while (re-search-forward "^[ \t]*CLOCK:" nil t)
         (let ((line (line-number-at-pos (match-beginning 0))))

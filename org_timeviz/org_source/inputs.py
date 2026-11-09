@@ -1,5 +1,6 @@
 """Resolve configured Org sources and prepare the Emacs batch environment."""
 
+import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,6 +18,7 @@ class OrgInputs:
 
     org_files: list[Path]
     agenda_init_path: Path | None
+    todo_keywords: list[str] | None = None
 
 
 def resolve_org_inputs(cfg: AppConfig) -> OrgInputs:
@@ -38,6 +40,7 @@ def resolve_org_inputs(cfg: AppConfig) -> OrgInputs:
             return OrgInputs(
                 org_files=_with_archive_files(result.files),
                 agenda_init_path=result.source_path,
+                todo_keywords=result.todo_keywords,
             )
 
     raise FileNotFoundError(
@@ -45,8 +48,17 @@ def resolve_org_inputs(cfg: AppConfig) -> OrgInputs:
     )
 
 
-def configure_emacs_init(cfg: AppConfig, preferred_init_path: Path | None) -> None:
-    """Set the init-file environment variable used by the Emacs batch exporter."""
+def configure_emacs_init(
+    cfg: AppConfig,
+    preferred_init_path: Path | None,
+    *,
+    todo_keywords: list[str] | None = None,
+) -> None:
+    """Pass evaluated TODO keyword data, never executable init code, to readers."""
+    os.environ.pop("ORG_TIMEVIZ_EMACS_INIT", None)
+    if todo_keywords is not None:
+        os.environ["ORG_TIMEVIZ_TODO_KEYWORDS"] = json.dumps(todo_keywords)
+        return
     candidates: list[Path] = []
     if preferred_init_path is not None:
         candidates.append(preferred_init_path)
@@ -58,9 +70,11 @@ def configure_emacs_init(cfg: AppConfig, preferred_init_path: Path | None) -> No
 
     for init_path in candidates:
         if init_path.exists():
-            os.environ["ORG_TIMEVIZ_EMACS_INIT"] = str(init_path)
-            os.environ.pop("ORG_TIMEVIZ_TODO_KEYWORDS", None)
-            return
+            result = read_agenda_files_from_emacs_init(init_path, cfg.org_sources.emacs_agenda_var)
+            if result is not None:
+                os.environ["ORG_TIMEVIZ_TODO_KEYWORDS"] = json.dumps(result.todo_keywords)
+                os.environ.pop("ORG_TIMEVIZ_EMACS_INIT", None)
+                return
 
     os.environ.pop("ORG_TIMEVIZ_EMACS_INIT", None)
     os.environ.pop("ORG_TIMEVIZ_TODO_KEYWORDS", None)

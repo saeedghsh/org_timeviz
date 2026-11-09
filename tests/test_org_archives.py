@@ -357,6 +357,8 @@ LEAVE_ORG = """\
 CLOCK: [2026-03-02 Mon 08:00]--[2026-03-02 Mon 17:00] =>  9:00
 :END:
 """
+
+
 @pytest.fixture
 def dashboard_workspace(tmp_path: Path) -> tuple[AppConfig, Path]:
     """Return a config whose `org-agenda-files` lists only the active files."""

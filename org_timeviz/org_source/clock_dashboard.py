@@ -8,7 +8,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from ..config import AppConfig
-from .inputs import resolve_org_inputs
+from .inputs import configure_emacs_init, resolve_org_inputs
 
 _LOG = logging.getLogger(__name__)
 DASHBOARD_JSON_PREFIX = "ORG_TIMEVIZ_CLOCK_DASHBOARD_JSON:"
@@ -67,10 +67,10 @@ def render_clock_dashboard(
     if not script_path.exists():
         raise FileNotFoundError(f"Missing clock dashboard exporter: {script_path}")
     # Scan the same active and archive files as the reports, not `org-agenda-files`.
+    inputs = resolve_org_inputs(cfg)
+    configure_emacs_init(cfg, inputs.agenda_init_path, todo_keywords=inputs.todo_keywords)
     org_files = [
-        path.expanduser().resolve()
-        for path in resolve_org_inputs(cfg).org_files
-        if path.expanduser().exists()
+        path.expanduser().resolve() for path in inputs.org_files if path.expanduser().exists()
     ]
 
     cmd = [
